@@ -1,0 +1,21 @@
+{
+  "tact_s": 0.25,
+  "wake_s": 600,
+  "sleep_s": 60,
+  "drowsy_max_s": 30,
+  "sleep_pressure_events": 2000,
+  "eta": 0.1,
+  "decay": 0.01,
+  "trace_tau_s": 30,
+  "max_dw": 0.3,
+  "w_min": 0.02,
+  "explore": 0.1,
+  "streams": ["речь", "моторика", "тело"],
+  "deadlines_s": {"речь": 60, "моторика": 5, "тело": 1},
+  "max_chain": 2,
+  "cost_per_core_s": 0.001,
+  "pain_lag_ms": 200,
+  "vitals_every": 4,
+  "mother_share0": 0.8,
+  "mother_tau_days": 30
+}

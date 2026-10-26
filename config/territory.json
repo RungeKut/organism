@@ -1,0 +1,14 @@
+{
+  "_о_файле": "Территория и лимиты уровня 0. Пишет только человек, организм файл только читает.",
+  "max_streams": 8,
+  "max_llm_slots": 4,
+  "headroom": 0.25,
+  "max_actions_per_hour": 120,
+  "exec_enabled": true,
+  "exec_allowlist": ["python --version", "git --version", "git status", "git log", "uv --version"],
+  "exec_timeout_s": 10,
+  "allow_network": false,
+  "llm_url": "http://127.0.0.1:8080",
+  "mother_url": null,
+  "tact_bounds_s": [0.05, 60]
+}

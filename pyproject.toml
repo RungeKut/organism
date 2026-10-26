@@ -1,0 +1,12 @@
+[project]
+name = "organism"
+version = "0.1.0"
+description = "Саморасширяющийся ИИ-организм: ствол, граф акторов, потоки-органы, сон"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+body = ["psutil>=5.9"]
+
+[tool.uv]
+package = false
