@@ -5,3 +5,4 @@ __pycache__/
 uv.lock
 result/
 go.md
+outbox/
