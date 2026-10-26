@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 from .body import BodyMap
 from .config import Genome, Territory
@@ -30,6 +30,7 @@ class Ctx:
     body: BodyMap
     streams: dict = field(default_factory=dict)
     lag_ms: float = 0.0
+    reflexes: Any = None
     stats: dict = field(default_factory=lambda: defaultdict(int))
     clock: Callable[[], float] = time.monotonic
 

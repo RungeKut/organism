@@ -29,6 +29,8 @@ class Territory:
     llm_url: str = "http://127.0.0.1:8080"
     mother_url: str | None = None
     tact_bounds_s: tuple[float, float] = (0.05, 60.0)
+    max_children: int = 1
+    generation_every_sleeps: int = 0
 
     @classmethod
     def load(cls, path: Path) -> Territory:

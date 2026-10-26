@@ -74,8 +74,12 @@ class LlamaCpp(LLM):
     def _post(self, payload: dict, timeout: float) -> str:
         req = urllib.request.Request(self.url + "/v1/chat/completions", data=json.dumps(payload).encode("utf-8"),
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.load(resp)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.load(resp)
+        except urllib.error.HTTPError as e:
+            e.close()
+            raise
         self.last_tps = float(data.get("timings", {}).get("predicted_per_second", self.last_tps))
         return data["choices"][0]["message"]["content"]
 

@@ -91,17 +91,41 @@ class Speech(Stream):
     def __init__(self, name: str, ctx: Ctx):
         super().__init__(name, ctx)
         self.dialogs: dict[str, list[dict]] = {}
+        self.reflex: dict[str, dict] = {}
+
+    def specialists(self) -> list[str]:
+        registry = self.ctx.graph.registry
+        return sorted(p for p, owners in registry.items() if owners and p not in ("речь", "моторика"))
 
     def system_prompt(self) -> str:
         c = self.ctx
         memory = "\n".join(f"- {m}" for m in c.journal.memories()) or "- пока пусто"
         allowed = "; ".join(c.territory.exec_allowlist) or "нет"
+        specialists = ", ".join(self.specialists())
+        crew = f"Специалисты (адресуй вопрос по профессии в «кому»): {specialists}.\n" if specialists else ""
         return ("Ты — организм, живущий на этой машине. Говори по-русски. Отвечай строго конвертом:\n"
                 "кому: пользователь или моторика\nтип: ответ, просьба или отказ\n"
                 "уверенность: число от 0 до 1\nтекст: сообщение\n"
                 f"Моторике адресуй только точную команду из списка: {allowed}. "
                 "Если не знаешь — скажи «не уверен» и поставь низкую уверенность.\n"
-                f"Память:\n{memory}")
+                f"{crew}Память:\n{memory}")
+
+    def next_reflex(self, episode: str) -> bool:
+        state = self.reflex[episode]
+        env = Envelope("моторика", "просьба", state["left"].pop(0), 1.0)
+        if self.forward(env, episode, 0, "моторика", self.name):
+            return True
+        self.reflex.pop(episode, None)
+        return False
+
+    def continue_reflex(self, episode: str, p: dict) -> None:
+        state = self.reflex[episode]
+        state["out"].append(p.get("text", ""))
+        if p.get("ok") and state["left"] and self.next_reflex(episode):
+            return
+        self.reflex.pop(episode, None)
+        self.propose("голос", {"text": "\n".join(state["out"]), "episode": episode, "kind": "ответ",
+                               "confidence": 1.0 if p.get("ok") else 0.3}, 1.0 if p.get("ok") else 0.3)
 
     async def think(self, episode: str, text: str) -> Envelope:
         c = self.ctx
@@ -119,19 +143,32 @@ class Speech(Stream):
         return Envelope.parse(raw) or Envelope("пользователь", "ответ", raw.strip(), 0.3)
 
     async def handle(self, ev: Event) -> None:
+        c = self.ctx
         p = ev.payload
         episode, hops = p.get("episode", ""), p.get("hops", 0)
         if ev.topic == "вход":
             text = p["text"]
+            cmds = c.reflexes.match(text) if c.reflexes else None
+            if cmds:
+                self.reflex[episode] = {"left": list(cmds), "out": []}
+                if self.next_reflex(episode):
+                    return
         elif ev.topic == "результат":
-            text = f"Моторика сообщает: {'успех' if p.get('ok') else 'отказ'}\n{p.get('text', '')}"
+            if episode in self.reflex:
+                self.continue_reflex(episode, p)
+                return
+            profession = p.get("profession")
+            who = f"Специалист «{profession}»" if profession else "Моторика"
+            if profession and p.get("ok") and ev.source in c.streams:
+                c.streams[ev.source].earned += 0.1
+            text = f"{who} сообщает: {'успех' if p.get('ok') else 'отказ'}\n{p.get('text', '')}"
         else:
             return
         env = await self.think(episode, text)
-        if env.to == "моторика":
-            if self.forward(env, episode, hops, "моторика", self.name):
+        if env.to not in ("речь", "пользователь") and c.graph.registry.get(env.to):
+            if self.forward(env, episode, hops, env.to, self.name):
                 return
-            env = Envelope("пользователь", "отказ", "Не смог передать просьбу моторике", 1.0)
+            env = Envelope("пользователь", "отказ", f"Не смог передать просьбу: {env.to}", 1.0)
         self.dialogs.pop(episode, None)
         self.propose("голос", {"text": env.text, "episode": episode, "kind": env.kind,
                                "confidence": env.confidence}, env.confidence)

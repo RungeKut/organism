@@ -10,5 +10,7 @@
   "allow_network": false,
   "llm_url": "http://127.0.0.1:8080",
   "mother_url": null,
-  "tact_bounds_s": [0.05, 60]
+  "tact_bounds_s": [0.05, 60],
+  "max_children": 1,
+  "generation_every_sleeps": 0
 }

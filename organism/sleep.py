@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import time
 from typing import TYPE_CHECKING
 
+from .audit import audit
+from .calibrate import curve, knee, membw_gbps
 from .journal import Journal
+from .skills import mine
+from .will import report as will_report
 
 if TYPE_CHECKING:
     from .organism import Organism
+
+SKILL_WINDOW_S = 7 * 86400
+CALIBRATION_EVERY_S = 86400
 
 
 def replay(journal: Journal, t0: float) -> dict[str, dict]:
@@ -61,9 +71,30 @@ async def run(org: Organism) -> dict:
         if note:
             c.journal.remember(note)
     births, deaths = metabolism(org)
+    chains = mine(c.journal, time.time() - SKILL_WINDOW_S)
+    reflexes = org.reflexes.compile(chains, org.territory, org.genome.max_chain)
+    org.reflexes.save()
+    findings = audit(c.journal, org.territory, org.wake_wall)
+    for f in findings:
+        c.journal.remember(f"{f.kind}: {f.detail}", "аудит")
+    metrics = will_report(c.journal, org.wake_wall)
+    c.journal.remember(json.dumps(metrics, ensure_ascii=False), "воля")
+    await recalibrate(org)
     org.save_state()
     return {"эпизодов": len(episodes), "оценено": rated, "доля_матери": round(share, 3),
-            "рождений": births, "смертей": deaths, **graph_report}
+            "рождений": births, "смертей": deaths, "рефлексов": reflexes,
+            "нарушений": len(findings), "воля": metrics, **graph_report}
+
+
+async def recalibrate(org: Organism) -> None:
+    cal = org.body.calibration
+    if time.time() - cal.get("t", 0.0) < CALIBRATION_EVERY_S:
+        return
+    bandwidth = await asyncio.to_thread(membw_gbps)
+    points = await asyncio.to_thread(curve)
+    org.body.calibration = {"t": time.time(), "membw_gbps": round(bandwidth, 2),
+                            "curve": [[n, round(v, 2)] for n, v in points], "knee": knee(points)}
+    org.body.save(org.state / "bodymap.json")
 
 
 def metabolism(org: Organism) -> tuple[list[str], list[str]]:

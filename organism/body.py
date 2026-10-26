@@ -19,6 +19,7 @@ class BodyMap:
     numa_nodes: list[dict]
     warnings: list[str] = field(default_factory=list)
     loop_lag_ms: float = 0.0
+    calibration: dict = field(default_factory=dict)
     measured_at: float = field(default_factory=time.time)
 
     @property

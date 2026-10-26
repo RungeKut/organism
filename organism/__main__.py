@@ -6,6 +6,7 @@ import json
 import tempfile
 import urllib.request
 
+from . import generations
 from .body import inventory
 from .config import ROOT, Genome, Territory
 from .llm import AIMD, LLM, FakeLLM, LlamaCpp
@@ -77,8 +78,11 @@ def main() -> None:
     parser.add_argument("--fake", action="store_true", help="не ходить в llama.cpp, говорить заглушкой")
     parser.add_argument("--demo", action="store_true", help="короткий прогон бодрствование → сон → бодрствование")
     parser.add_argument("--body", action="store_true", help="показать карту тела и выйти")
+    parser.add_argument("--approve", metavar="ТОКЕН", help="подтвердить смену поколения (организм остановлен)")
     args = parser.parse_args()
-    if args.body:
+    if args.approve:
+        print("смена поколения принята" if generations.approve(ROOT / "state", args.approve) else "токен не подошёл")
+    elif args.body:
         print(json.dumps(inventory().__dict__, ensure_ascii=False, indent=2))
     elif args.demo:
         asyncio.run(demo())

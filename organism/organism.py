@@ -16,10 +16,14 @@ from .graph import Graph
 from .journal import Journal
 from .llm import AIMD, LLM, FakeLLM, LlamaCpp
 from .mother import Mother
+from .skills import ReflexCache
 from .sleep import run as sleep_run
+from .society import load_professions, make_specialist
 from .stem import Grant, Phase, Stem
 from .streams import STREAM_TYPES, Stream
 from .workspace import Proposal, Workspace
+
+STREAM_TYPES.update({p.name: make_specialist(p) for p in load_professions(ROOT / "config" / "professions.json")})
 
 
 class Organism:
@@ -44,6 +48,7 @@ class Organism:
         self.ctx = Ctx(self.territory, self.genome, self.stem, self.graph, self.bus, self.journal, self.llm,
                        self.workspace, self.executor, self.body, clock=clock)
         self.streams: dict[str, Stream] = self.ctx.streams
+        self.reflexes = self.ctx.reflexes = ReflexCache(self.state / "reflexes.json")
         mother_llm = self.llm
         if self.territory.mother_url:
             mother_llm = LlamaCpp(self.territory.mother_url, AIMD(1), self.territory.allow_network)
@@ -85,6 +90,8 @@ class Organism:
         cls = STREAM_TYPES.get(name.split("-")[0])
         if cls is None:
             return Grant(False, "неизвестный тип потока")
+        if name in self.streams:
+            return Grant(True, "уже живёт")
         grant = self.stem.request_stream(name, cls.cores, self.body.capacity_cores)
         if not grant.ok:
             return grant
@@ -112,7 +119,8 @@ class Organism:
 
     def save_state(self) -> None:
         self.graph.save(self.state / "graph.json")
-        self.genome.save(self.state / "genome.json")
+        if not (self.state / "genome.json").exists():
+            self.genome.save(self.state / "genome.json")
 
     def busy(self) -> int:
         queued = sum(s.queue.qsize() for s in self.streams.values())
@@ -175,8 +183,23 @@ class Organism:
             self.last_sleep_report = await sleep_run(self)
             self.sleeps += 1
             self.journal.remember(str(self.last_sleep_report), "сон")
+            every = self.territory.generation_every_sleeps
+            if every and self.sleeps % every == 0:
+                await self._breed()
         finally:
             self.stem.sleep_done()
+
+    async def _breed(self) -> None:
+        from . import generations
+        texts = generations.inputs(self.journal, self.wake_wall)[:8]
+        if not texts:
+            return
+        _, kids = await generations.breed(self.genome, texts, self.llm, self.rng,
+                                          max_children=self.territory.max_children)
+        if kids:
+            generations.propose(self.state, self.genome, [k for _, k in kids], [s for s, _ in kids],
+                                self.territory.max_children)
+            self.journal.event(Event("поколение_предложено", "ствол", {"детей": len(kids)}))
 
     def _act(self, p: Proposal) -> None:
         self.workspace.post(p.stream, p.effector, str(p.payload.get("text") or p.payload.get("cmd", "")))
