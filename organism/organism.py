@@ -10,6 +10,8 @@ from typing import Callable
 from .body import BodyMap, inventory, loop_lag_ms
 from .config import ROOT, Genome, Territory
 from .context import Ctx
+from .coordinator import Coordinator
+from .drive import Drive
 from .events import Bus, Event
 from .executor import Executor
 from .graph import Graph
@@ -23,7 +25,13 @@ from .stem import Grant, Phase, Stem
 from .streams import STREAM_TYPES, Stream
 from .workspace import Proposal, Workspace
 
-STREAM_TYPES.update({p.name: make_specialist(p) for p in load_professions(ROOT / "config" / "professions.json")})
+RESERVED = frozenset({"речь", "моторика", "тело", "пользователь", "выход", "селектор", "ствол"})
+BREED_TIMEOUT_S = 120.0
+
+STREAM_TYPES["координатор"] = Coordinator
+STREAM_TYPES["влечение"] = Drive
+STREAM_TYPES.update({p.name: make_specialist(p) for p in load_professions(ROOT / "config" / "professions.json")
+                     if p.name not in STREAM_TYPES and p.name not in RESERVED and "-" not in p.name})
 
 
 class Organism:
@@ -55,6 +63,7 @@ class Organism:
         self.mother = Mother(mother_llm, self.genome, self.state / "birth.txt")
         self.wake_wall = time.time()
         self._episodes = itertools.count(1)
+        self._run = format(time.time_ns(), "x")
         self._waiting: dict[str, asyncio.Future] = {}
         self._acts: set[asyncio.Task] = set()
         self._ticker: asyncio.Task | None = None
@@ -96,7 +105,7 @@ class Organism:
         if not grant.ok:
             return grant
         stream = cls(name, self.ctx)
-        stream.protected = name == stream.base
+        stream.protected = cls.protected and name == stream.base
         self.streams[name] = stream
         stream.start()
         self.journal.event(Event("рождение", "ствол", {"поток": name}))
@@ -133,7 +142,7 @@ class Organism:
         target = self.graph.route("пользователь", "речь")
         if target is None:
             return None
-        episode = f"э{next(self._episodes)}"
+        episode = f"э{self._run}.{next(self._episodes)}"
         waiter = asyncio.get_running_loop().create_future()
         self._waiting[episode] = waiter
         self.bus.send(Event("вход", "пользователь", {"text": text, "episode": episode, "hops": 0}), target)
@@ -159,7 +168,10 @@ class Organism:
         sample = max(0.0, (dt - self.stem.tact_s) * 1000.0)
         self.ctx.lag_ms = 0.7 * self.ctx.lag_ms + 0.3 * sample
         self.graph.decay_traces(dt)
-        winners, expired = self.workspace.select(now)
+        if self.stem.phase is Phase.SLEEP:
+            winners, expired = [], []
+        else:
+            winners, expired = self.workspace.select(now)
         for p in expired:
             self._expire(p)
         for p in winners:
@@ -169,14 +181,13 @@ class Organism:
             if stream.period and self._n % stream.period == 0:
                 await stream.pulse()
         phase = self.stem.tick(self.busy())
-        if phase is Phase.DROWSY:
+        if phase is not None:
             self.journal.phase = phase.value
-        elif phase is Phase.SLEEP:
-            self.journal.phase = phase.value
-            self._sleep_task = asyncio.create_task(self._sleep())
-        elif phase is Phase.WAKE:
-            self.journal.phase = phase.value
-            self.wake_wall = time.time()
+            self.journal.event(Event("фаза", "ствол", {"фаза": phase.value}))
+            if phase is Phase.SLEEP:
+                self._sleep_task = asyncio.create_task(self._sleep())
+            elif phase is Phase.WAKE:
+                self.wake_wall = time.time()
 
     async def _sleep(self) -> None:
         try:
@@ -185,7 +196,14 @@ class Organism:
             self.journal.remember(str(self.last_sleep_report), "сон")
             every = self.territory.generation_every_sleeps
             if every and self.sleeps % every == 0:
-                await self._breed()
+                try:
+                    await asyncio.wait_for(self._breed(), BREED_TIMEOUT_S)
+                except asyncio.TimeoutError:
+                    self.journal.action("сбой", False, {"сон": "поколение: таймаут"})
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            self.journal.action("сбой", False, {"сон": f"{type(e).__name__}: {e}"})
         finally:
             self.stem.sleep_done()
 

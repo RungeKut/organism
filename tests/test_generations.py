@@ -74,7 +74,7 @@ class TrialTest(unittest.IsolatedAsyncioTestCase):
             fast().save(parent / "genome.json")
             before = tree(parent)
             score = await gen.trial(fast(), ["привет", "выполни команду"], FakeLLM(), Path(box) / "потомок")
-            self.assertAlmostEqual(score, 2.0)
+            self.assertAlmostEqual(score, 1.0)
             self.assertEqual(tree(parent), before)
             self.assertTrue((Path(box) / "потомок" / "organism.db").exists())
         self.assertEqual(digest(), h0)

@@ -29,7 +29,11 @@ def load_professions(path: Path | str) -> list[Profession]:
         return []
     names = {f.name for f in fields(Profession)}
     result = []
-    for row in json.loads(path.read_text(encoding="utf-8")):
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        return []
+    for row in rows:
         data = {k: v for k, v in row.items() if k in names}
         data.setdefault("lora_id", None)
         data["tools"] = tuple(data.get("tools", ()))

@@ -5,6 +5,7 @@ from typing import Any
 
 from .context import Ctx
 from .events import Event
+from .ladder import Ladder, Rung
 from .llm import LLMError
 from .protocol import Envelope
 from .workspace import Proposal
@@ -92,6 +93,7 @@ class Speech(Stream):
         super().__init__(name, ctx)
         self.dialogs: dict[str, list[dict]] = {}
         self.reflex: dict[str, dict] = {}
+        self.ladder = Ladder(ctx)
 
     def specialists(self) -> list[str]:
         registry = self.ctx.graph.registry
@@ -127,15 +129,18 @@ class Speech(Stream):
         self.propose("голос", {"text": "\n".join(state["out"]), "episode": episode, "kind": "ответ",
                                "confidence": 1.0 if p.get("ok") else 0.3}, 1.0 if p.get("ok") else 0.3)
 
-    async def think(self, episode: str, text: str) -> Envelope:
+    async def think(self, episode: str, text: str, rung: Rung = Rung.THINK) -> Envelope:
         c = self.ctx
         dialog = self.dialogs.setdefault(episode, [])
         dialog.append({"role": "user", "content": text})
         if len(self.dialogs) > 50:
             self.dialogs.pop(next(iter(self.dialogs)))
-        messages = [{"role": "system", "content": self.system_prompt()}] + dialog
+        hint = self.ladder.system_hint(rung)
+        system = self.system_prompt() + (f"\n{hint}" if hint else "")
+        messages = [{"role": "system", "content": system}] + dialog
         try:
-            raw = await c.llm.chat(messages, max_tokens=256, deadline_s=self.deadline_s)
+            raw = await c.llm.chat(messages, max_tokens=self.ladder.max_tokens(rung) or 256,
+                                   deadline_s=self.deadline_s)
         except (LLMError, PermissionError) as e:
             c.stats["сбой_llm"] += 1
             return Envelope("пользователь", "отказ", f"Не могу думать: {e}", 0.0)
@@ -146,10 +151,14 @@ class Speech(Stream):
         c = self.ctx
         p = ev.payload
         episode, hops = p.get("episode", ""), p.get("hops", 0)
+        rung = Rung.THINK
         if ev.topic == "вход":
             text = p["text"]
-            cmds = c.reflexes.match(text) if c.reflexes else None
-            if cmds:
+            rung = self.ladder.pick(text)
+            cmds = c.reflexes.match(text) if rung is Rung.REFLEX and c.reflexes else None
+            if cmds and all(cmd in c.territory.exec_allowlist for cmd in cmds):
+                if len(self.reflex) > 50:
+                    self.reflex.pop(next(iter(self.reflex)))
                 self.reflex[episode] = {"left": list(cmds), "out": []}
                 if self.next_reflex(episode):
                     return
@@ -164,7 +173,7 @@ class Speech(Stream):
             text = f"{who} сообщает: {'успех' if p.get('ok') else 'отказ'}\n{p.get('text', '')}"
         else:
             return
-        env = await self.think(episode, text)
+        env = await self.think(episode, text, rung)
         if env.to not in ("речь", "пользователь") and c.graph.registry.get(env.to):
             if self.forward(env, episode, hops, env.to, self.name):
                 return

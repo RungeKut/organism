@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import secrets
 import tempfile
@@ -53,7 +54,8 @@ def inputs(j: Journal, t0: float) -> list[str]:
 async def trial(g: Genome, texts: list[str], llm: LLM, tmp: Path) -> float:
     if not texts:
         return 0.0
-    org = Organism(Path(tmp), llm, Territory.load(ROOT / "config" / "territory.json"), copy.deepcopy(g))
+    territory = dataclasses.replace(Territory.load(ROOT / "config" / "territory.json"), exec_enabled=False)
+    org = Organism(Path(tmp), llm, territory, copy.deepcopy(g))
     answered = 0
     try:
         await org.start()
@@ -119,6 +121,9 @@ def approve(state: Path, token: str) -> bool:
     if not secrets.compare_digest(str(data.get("token", "")), token):
         return False
     best = max(data["kids"], key=lambda k: k["score"])
-    Genome(**_known(Genome, best["genome"])).save(Path(state) / "genome.json")
+    genome = Genome(**_known(Genome, best["genome"]))
+    for name in BOUNDS:
+        setattr(genome, name, _clip(name, getattr(genome, name)))
+    genome.save(Path(state) / "genome.json")
     path.unlink()
     return True

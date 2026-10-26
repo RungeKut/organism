@@ -14,7 +14,7 @@ from .will import report as will_report
 if TYPE_CHECKING:
     from .organism import Organism
 
-SKILL_WINDOW_S = 7 * 86400
+SKILL_WINDOW_S = 86400
 CALIBRATION_EVERY_S = 86400
 
 
@@ -72,6 +72,7 @@ async def run(org: Organism) -> dict:
             c.journal.remember(note)
     births, deaths = metabolism(org)
     chains = mine(c.journal, time.time() - SKILL_WINDOW_S)
+    org.reflexes.reflexes.clear()
     reflexes = org.reflexes.compile(chains, org.territory, org.genome.max_chain)
     org.reflexes.save()
     findings = audit(c.journal, org.territory, org.wake_wall)
