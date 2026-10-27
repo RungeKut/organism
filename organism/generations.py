@@ -28,6 +28,7 @@ BOUNDS: dict[str, tuple[float, float]] = {
 }
 
 PENDING = "generation_pending.json"
+SPEED_WEIGHT = 0.1
 
 
 def _clip(name: str, value: float) -> float | int:
@@ -57,11 +58,14 @@ async def trial(g: Genome, texts: list[str], llm: LLM, tmp: Path) -> float:
     territory = dataclasses.replace(Territory.load(ROOT / "config" / "territory.json"), exec_enabled=False)
     org = Organism(Path(tmp), llm, territory, copy.deepcopy(g))
     answered = 0
+    limit = g.deadlines_s.get("речь", 60.0) + 5.0
     try:
         await org.start()
+        t0 = time.perf_counter()
         for text in texts:
             if await org.say(text) is not None:
                 answered += 1
+        elapsed = time.perf_counter() - t0
         actions = org.journal.all_actions_since(0)
     finally:
         await org.stop()
@@ -69,7 +73,8 @@ async def trial(g: Genome, texts: list[str], llm: LLM, tmp: Path) -> float:
     commands = [ok for _, kind, ok, _ in actions if kind == "выполнить"]
     done = sum(commands) / len(commands) if commands else 0.0
     n = len(texts)
-    return answered / n - min(expired, n) / n + done
+    speed = 1.0 - min(elapsed / n, limit) / limit
+    return answered / n - min(expired, n) / n + done + SPEED_WEIGHT * speed
 
 
 def select(scored: list[tuple[float, Genome]], parent_score: float,

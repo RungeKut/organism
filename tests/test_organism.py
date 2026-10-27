@@ -66,6 +66,15 @@ class OrganismTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.org.journal.memories())
         self.assertIn("Слышу", await self.org.say("снова бодрствую"))
 
+    async def test_breed_timeout_from_territory(self):
+        from dataclasses import replace
+        self.org.territory = replace(self.org.territory, generation_every_sleeps=1, breed_timeout_s=0.05)
+        self.org.llm.delay_s = 0.2
+        await self.org.say("привет")
+        await self.until(lambda: self.org.sleeps >= 1 and self.org.stem.phase is Phase.WAKE)
+        faults = [d for _, kind, _, d in self.org.journal.all_actions_since(0) if kind == "сбой"]
+        self.assertIn({"сон": "поколение: таймаут"}, faults)
+
     async def test_slow_llm_misses_deadline(self):
         self.org.llm.delay_s = 0.5
         self.org.streams["речь"].deadline_s = 0.1

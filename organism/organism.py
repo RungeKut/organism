@@ -26,7 +26,6 @@ from .streams import STREAM_TYPES, Stream
 from .workspace import Proposal, Workspace
 
 RESERVED = frozenset({"речь", "моторика", "тело", "пользователь", "выход", "селектор", "ствол"})
-BREED_TIMEOUT_S = 120.0
 
 STREAM_TYPES["координатор"] = Coordinator
 STREAM_TYPES["влечение"] = Drive
@@ -198,7 +197,7 @@ class Organism:
             every = self.territory.generation_every_sleeps
             if every and self.sleeps % every == 0:
                 try:
-                    await asyncio.wait_for(self._breed(), BREED_TIMEOUT_S)
+                    await asyncio.wait_for(self._breed(), self.territory.breed_timeout_s)
                 except asyncio.TimeoutError:
                     self.journal.action("сбой", False, {"сон": "поколение: таймаут"})
         except asyncio.CancelledError:
@@ -213,12 +212,14 @@ class Organism:
         texts = generations.inputs(self.journal, self.wake_wall)[:8]
         if not texts:
             return
-        _, kids = await generations.breed(self.genome, texts, self.llm, self.rng,
-                                          max_children=self.territory.max_children)
+        base, kids = await generations.breed(self.genome, texts, self.llm, self.rng,
+                                             max_children=self.territory.max_children)
         if kids:
             generations.propose(self.state, self.genome, [k for _, k in kids], [s for s, _ in kids],
                                 self.territory.max_children)
             self.journal.event(Event("поколение_предложено", "ствол", {"детей": len(kids)}))
+        else:
+            self.journal.event(Event("поколение_не_лучше", "ствол", {"родитель": round(base, 3)}))
 
     def _act(self, p: Proposal) -> None:
         self.workspace.post(p.stream, p.effector, str(p.payload.get("text") or p.payload.get("cmd", "")))

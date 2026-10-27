@@ -31,6 +31,7 @@ class Territory:
     tact_bounds_s: tuple[float, float] = (0.05, 60.0)
     max_children: int = 1
     generation_every_sleeps: int = 0
+    breed_timeout_s: float = 600.0
 
     @classmethod
     def load(cls, path: Path) -> Territory:

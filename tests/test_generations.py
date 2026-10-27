@@ -74,7 +74,8 @@ class TrialTest(unittest.IsolatedAsyncioTestCase):
             fast().save(parent / "genome.json")
             before = tree(parent)
             score = await gen.trial(fast(), ["привет", "выполни команду"], FakeLLM(), Path(box) / "потомок")
-            self.assertAlmostEqual(score, 1.0)
+            self.assertGreater(score, 1.0)
+            self.assertLessEqual(score, 1.0 + gen.SPEED_WEIGHT)
             self.assertEqual(tree(parent), before)
             self.assertTrue((Path(box) / "потомок" / "organism.db").exists())
         self.assertEqual(digest(), h0)
@@ -86,6 +87,15 @@ class TrialTest(unittest.IsolatedAsyncioTestCase):
             g.deadlines_s = {"речь": 0.05, "моторика": 5.0, "тело": 1.0}
             score = await gen.trial(g, ["медленно"], FakeLLM(delay_s=0.4), Path(box))
         self.assertLess(score, 0.5)
+
+    async def test_faster_genome_breaks_tie(self):
+        quick, slow = fast(), fast()
+        slow.tact_s = 0.5
+        with tempfile.TemporaryDirectory() as box:
+            a = await gen.trial(quick, ["привет", "как дела"], FakeLLM(), Path(box) / "а")
+            b = await gen.trial(slow, ["привет", "как дела"], FakeLLM(), Path(box) / "б")
+        self.assertGreater(a, b)
+        self.assertGreater(b, 1.0)
 
     async def test_breed_respects_max_children(self):
         h0 = digest()

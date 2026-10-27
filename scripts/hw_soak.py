@@ -21,13 +21,15 @@ from organism.organism import Organism
 from scripts.hw_live import PHRASES, healthy
 
 
+class Counters(ctypes.Structure):
+    _fields_ = [("cb", ctypes.c_ulong), ("PageFaultCount", ctypes.c_ulong)] + [
+        (n, ctypes.c_size_t) for n in ("PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
+                                       "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
+                                       "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
+
+
 def rss_mb() -> float:
     if os.name == "nt":
-        class Counters(ctypes.Structure):
-            _fields_ = [("cb", ctypes.c_ulong), ("PageFaultCount", ctypes.c_ulong)] + [
-                (n, ctypes.c_size_t) for n in ("PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
-                                               "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
-                                               "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
         c = Counters(cb=ctypes.sizeof(Counters))
         psapi, k32 = ctypes.WinDLL("psapi"), ctypes.WinDLL("kernel32")
         k32.GetCurrentProcess.restype = ctypes.c_void_p
@@ -54,9 +56,9 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
     llm = LlamaCpp(url, AIMD(territory.max_llm_slots), territory.allow_network)
     org = Organism(state, llm, territory, genome or Genome(), seed=1)
     await org.start()
-    t0, n, seen_sleeps = time.monotonic(), 0, 0
+    t0, wall0, n, seen_sleeps = time.monotonic(), time.time(), 0, 0
     totals = {"вопросов": 0, "пустых": 0, "отклонено": 0, "нарушений": 0}
-    sleeps, rss = [], []
+    sleeps, rss, faults, breeds = [], [], [], []
     try:
         while time.monotonic() - t0 < hours * 3600:
             text = PHRASES[n % len(PHRASES)]
@@ -77,7 +79,7 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
                                                            "нарушений", "изменено", "срезано")})
             sample = {"t_мин": round((time.monotonic() - t0) / 60, 1), "фаза": org.stem.phase.value,
                       "сны": org.sleeps, "ответ_сек": round(time.perf_counter() - ts, 2), "ответ": bool(reply),
-                      "lag_ms": round(org.body.loop_lag_ms, 1), "rss_mb": rss_mb(), "state_mb": dir_mb(state),
+                      "lag_ms": round(org.ctx.lag_ms, 1), "rss_mb": rss_mb(), "state_mb": dir_mb(state),
                       "потоки": sorted(org.streams), "tps": round(llm.last_tps, 2)}
             rss.append(sample["rss_mb"])
             if out:
@@ -85,12 +87,15 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
                     f.write(json.dumps(sample, ensure_ascii=False) + "\n")
             await asyncio.sleep(max(0.0, every_s - (time.perf_counter() - ts)))
     finally:
+        faults = [d for _, kind, _, d in org.journal.all_actions_since(wall0) if kind == "сбой"]
+        for topic in ("поколение_предложено", "поколение_не_лучше"):
+            breeds += [{"итог": topic, **p} for _, _, p in org.journal.events_since(wall0, topic)]
         await org.stop()
     pending = generations.pending(state)
     saved = state / "genome.json"
     return {**totals, "геном_прежний": not saved.exists() or Genome.load(saved) == org.genome, "мин": round((time.monotonic() - t0) / 60, 1), "снов": org.sleeps, "сны": sleeps,
             "rss_mb": {"начало": rss[0] if rss else 0, "конец": rss[-1] if rss else 0, "макс": max(rss, default=0)},
-            "state_mb": dir_mb(state), "поколение_ждёт": bool(pending),
+            "state_mb": dir_mb(state), "сбои": faults, "разведения": breeds, "поколение_ждёт": bool(pending),
             "детей": len(pending.get("kids", [])) if pending else 0}
 
 
@@ -113,7 +118,10 @@ def main(argv=None) -> int:
     text = json.dumps(report, ensure_ascii=False, indent=2, default=str)
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
-    print(text)
+    try:
+        print(text, flush=True)
+    except OSError:
+        pass
     return 0
 
 

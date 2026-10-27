@@ -28,6 +28,10 @@ class HwSoakTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(report["геном_прежний"])
         self.assertNotIn("token", json.dumps(report, ensure_ascii=False))
         self.assertIn("state_mb", rows[-1])
+        self.assertEqual(report["сбои"], [])
+        self.assertTrue(report["разведения"])
+        self.assertEqual(report["поколение_ждёт"], any(b["итог"] == "поколение_предложено"
+                                                       for b in report["разведения"]))
 
     def test_main_without_server(self):
         with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()):
