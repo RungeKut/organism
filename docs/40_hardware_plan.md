@@ -25,8 +25,8 @@
 |---|---|---|
 | H0 | Распаковать архив; `uv run --python 3.10 python -m unittest discover -s tests -t .` прямо в Windows | Windows: 200 OK (сделано); WSL по желанию |
 | H1 | Железо: Windows-сведения получены. `scripts/hw_probe.py` на Windows даёт частичную картину; полная — только из Linux | пропускная способность и излом кривой потоков по зонду |
-| H2 | llama.cpp: готовый релиз для Windows x64 (AVX2) или сборка под Zen 2 в WSL (`scripts/hw_llama.py` печатает команды) | `llama-bench` запускается |
-| H3 | Скорости модели ~1B: потоки 8–96 при привязке к P0 и к P1; `hw_llama.py --parse файл.json` | генерация ≥ 10 ток/с; выбраны число потоков и привязка |
+| H2 | llama.cpp: готовый релиз для Windows x64 (AVX2) или сборка под Zen 2 в WSL (`scripts/hw_llama.py` печатает команды) | сделано: b11351, AVX2 |
+| H3 | Скорости модели ~1B: потоки 8–96 при привязке к P0 и к P1; `hw_llama.py --parse файл.json` | сделано: 46 ток/с на 16 потоках; привязка — шаг 4 |
 | H4 | Организм с настоящей моделью: `scripts/llama_server.py --dry-run`, затем `python -m organism` без `--fake` | ответ от модели, `last_tps` > 0, слоты AIMD растут без роста `lag_ms` |
 | H5 | Карта тела: `python -m organism --body`; сон с калибровкой | `bodymap.json` с `calibration` |
 | H6 | Сон и поколения на модели: `generation_every_sleeps=1` один раз, смена только через `--approve` | `trial` не выполняет команды, `genome.json` меняется только по токену |

@@ -14,11 +14,14 @@ if str(ROOT) not in sys.path:
 from organism.config import Territory
 
 
-def build_cmd(model: str, territory: Territory, lora=(), binary: str = "llama-server") -> list[str]:
+def build_cmd(model: str, territory: Territory, lora=(), binary: str = "llama-server",
+              threads: int | None = None) -> list[str]:
     parsed = urlparse(territory.llm_url)
     cmd = [binary, "-m", str(model), "-np", str(territory.max_llm_slots),
            "--host", parsed.hostname or "127.0.0.1", "--port", str(parsed.port or 8080),
            "--lora-init-without-apply"]
+    if threads:
+        cmd += ["-t", str(threads)]
     for path in lora:
         cmd += ["--lora", str(path)]
     return cmd
@@ -30,9 +33,10 @@ def main(argv=None) -> int:
     ap.add_argument("--territory", default=str(ROOT / "config" / "territory.json"))
     ap.add_argument("--lora", action="append", default=[])
     ap.add_argument("--binary", default="llama-server")
+    ap.add_argument("--threads", type=int, default=None)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
-    cmd = build_cmd(args.model, Territory.load(Path(args.territory)), args.lora, args.binary)
+    cmd = build_cmd(args.model, Territory.load(Path(args.territory)), args.lora, args.binary, args.threads)
     if args.dry_run:
         print(shlex.join(cmd))
         return 0
