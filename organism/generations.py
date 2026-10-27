@@ -123,7 +123,7 @@ def approve(state: Path, token: str) -> bool:
     data = pending(state)
     if data is None or not data.get("kids") or not isinstance(token, str):
         return False
-    if not secrets.compare_digest(str(data.get("token", "")), token):
+    if not secrets.compare_digest(str(data.get("token", "")).encode(), token.encode()):
         return False
     best = max(data["kids"], key=lambda k: k["score"])
     genome = Genome(**_known(Genome, best["genome"]))

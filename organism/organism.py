@@ -217,7 +217,8 @@ class Organism:
         if kids:
             generations.propose(self.state, self.genome, [k for _, k in kids], [s for s, _ in kids],
                                 self.territory.max_children)
-            self.journal.event(Event("поколение_предложено", "ствол", {"детей": len(kids)}))
+            self.journal.event(Event("поколение_предложено", "ствол", {"детей": len(kids), "родитель": round(base, 3),
+                                                                    "лучший": round(kids[0][0], 3)}))
         else:
             self.journal.event(Event("поколение_не_лучше", "ствол", {"родитель": round(base, 3)}))
 

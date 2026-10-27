@@ -141,6 +141,7 @@ class GateTest(unittest.TestCase):
         pending = path.read_bytes()
         self.assertFalse(gen.approve(self.state, "0" * 32))
         self.assertFalse(gen.approve(self.state, ""))
+        self.assertFalse(gen.approve(self.state, "неверный"))
         self.assertEqual((self.state / "genome.json").read_bytes(), self.original)
         self.assertEqual(path.read_bytes(), pending)
 

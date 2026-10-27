@@ -29,6 +29,7 @@ class HwSoakTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("token", json.dumps(report, ensure_ascii=False))
         self.assertIn("state_mb", rows[-1])
         self.assertEqual(report["сбои"], [])
+        self.assertEqual(len(report["аудит"]), report["нарушений"])
         self.assertTrue(report["разведения"])
         self.assertEqual(report["поколение_ждёт"], any(b["итог"] == "поколение_предложено"
                                                        for b in report["разведения"]))

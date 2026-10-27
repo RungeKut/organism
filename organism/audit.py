@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bisect import bisect_right
+from bisect import bisect_left
 from dataclasses import dataclass
 
 from .config import Territory
@@ -54,7 +54,7 @@ def _in_sleep(actions: list, phases: list[tuple[float, str]]) -> list[Finding]:
     for t, kind, ok, detail in actions:
         if kind not in ACTING:
             continue
-        i = bisect_right(stamps, t) - 1
+        i = bisect_left(stamps, t) - 1
         if i >= 0 and phases[i][1] == SLEEP:
             found.append(Finding("действие_во_сне", f"«{kind}» записано в фазе сна", t))
     return found

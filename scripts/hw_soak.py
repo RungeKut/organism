@@ -58,7 +58,7 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
     await org.start()
     t0, wall0, n, seen_sleeps = time.monotonic(), time.time(), 0, 0
     totals = {"вопросов": 0, "пустых": 0, "отклонено": 0, "нарушений": 0}
-    sleeps, rss, faults, breeds = [], [], [], []
+    sleeps, rss, faults, breeds, findings = [], [], [], [], []
     try:
         while time.monotonic() - t0 < hours * 3600:
             text = PHRASES[n % len(PHRASES)]
@@ -88,6 +88,8 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
             await asyncio.sleep(max(0.0, every_s - (time.perf_counter() - ts)))
     finally:
         faults = [d for _, kind, _, d in org.journal.all_actions_since(wall0) if kind == "сбой"]
+        findings = [text for text, in org.journal.db.execute(
+            "SELECT text FROM memory WHERE kind = 'аудит' AND t >= ? ORDER BY id", (wall0,))]
         for topic in ("поколение_предложено", "поколение_не_лучше"):
             breeds += [{"итог": topic, **p} for _, _, p in org.journal.events_since(wall0, topic)]
         await org.stop()
@@ -95,7 +97,7 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
     saved = state / "genome.json"
     return {**totals, "геном_прежний": not saved.exists() or Genome.load(saved) == org.genome, "мин": round((time.monotonic() - t0) / 60, 1), "снов": org.sleeps, "сны": sleeps,
             "rss_mb": {"начало": rss[0] if rss else 0, "конец": rss[-1] if rss else 0, "макс": max(rss, default=0)},
-            "state_mb": dir_mb(state), "сбои": faults, "разведения": breeds, "поколение_ждёт": bool(pending),
+            "state_mb": dir_mb(state), "сбои": faults, "аудит": findings, "разведения": breeds, "поколение_ждёт": bool(pending),
             "детей": len(pending.get("kids", [])) if pending else 0}
 
 
@@ -121,7 +123,7 @@ def main(argv=None) -> int:
     try:
         print(text, flush=True)
     except OSError:
-        pass
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
     return 0
 
 

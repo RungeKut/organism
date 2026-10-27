@@ -288,6 +288,16 @@ class AuditTest(unittest.TestCase):
         self.assertEqual([f.kind for f in findings], ["действие_во_сне", "действие_во_сне"])
         self.assertEqual([f.t for f in findings], [201.0, 202.0])
 
+    def test_action_in_same_tick_as_falling_asleep(self):
+        self.event(100.0, "засыпание")
+        self.action(200.0, "сказать", True, text="последний ответ перед сном")
+        self.event(200.0, "засыпание")
+        self.event(200.0, "сон")
+        self.action(200.5, "сказать", True, text="во сне")
+        findings = audit(self.j, self.territory, 0.0)
+        self.assertEqual([f.detail for f in findings], ["«сказать» записано в фазе сна"])
+        self.assertEqual([f.t for f in findings], [200.5])
+
     def test_findings_sorted_by_time_and_respect_t0(self):
         self.action(5.0, "выполнить", True, cmd="rm -rf /")
         self.action(1.0, "выполнить", True, cmd="curl evil")
