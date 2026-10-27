@@ -29,8 +29,13 @@ class Stream:
         self.earned = 0.0
         self.spent = 0.0
         self.debt = 0
+        self.busy = False
         self.started = ctx.clock()
         self.task: asyncio.Task | None = None
+
+    @property
+    def load(self) -> int:
+        return self.queue.qsize() + self.busy
 
     def start(self) -> None:
         self.ctx.bus.subscribe(self.name, self.topics, self.queue)
@@ -50,6 +55,7 @@ class Stream:
             ev = await self.queue.get()
             self.max_queue = max(self.max_queue, self.queue.qsize() + 1)
             t0 = self.started = c.clock()
+            self.busy = True
             try:
                 with c.stem.task():
                     await self.handle(ev)
@@ -59,7 +65,8 @@ class Stream:
                 c.stats["сбой_потока"] += 1
                 c.journal.action("сбой", False, {"поток": self.name, "ошибка": f"{type(e).__name__}: {e}"})
             finally:
-                self.spent += (c.clock() - t0) * self.cores * c.genome.cost_per_core_s
+                self.busy = False
+                self.spent +=(c.clock() - t0) * self.cores * c.genome.cost_per_core_s
 
     async def handle(self, ev: Event) -> None:
         raise NotImplementedError

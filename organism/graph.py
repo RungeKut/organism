@@ -6,6 +6,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from .config import Genome
 
@@ -24,6 +25,7 @@ class Graph:
         self.rng = rng or random.Random()
         self.edges: dict[tuple[str, str], Edge] = {}
         self.registry: dict[str, set[str]] = defaultdict(set)
+        self.load: Callable[[str], int] | None = None
 
     def edge(self, a: str, b: str) -> Edge:
         return self.edges.setdefault((a, b), Edge())
@@ -83,6 +85,10 @@ class Graph:
         candidates = sorted(self.registry.get(profession, ()))
         if not candidates:
             return None
+        if self.load and len(candidates) > 1:
+            loads = {c: self.load(c) for c in candidates}
+            least = min(loads.values())
+            candidates = [c for c in candidates if loads[c] == least]
         if len(candidates) == 1 or self.rng.random() < self.g.explore:
             return self.rng.choice(candidates)
         best = max(self.weight(source, c) for c in candidates)

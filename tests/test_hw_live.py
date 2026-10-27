@@ -8,7 +8,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from organism.config import Territory
+from organism.config import Genome, Territory
 from scripts import hw_live, llama_server
 from tests.openai_stub import Stub
 
@@ -24,6 +24,16 @@ class HwLiveTest(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(report["слоты"]["предел"], 1)
         self.assertIn("lag_ms", report)
         json.dumps(report, ensure_ascii=False)
+
+    async def test_cycle_sleeps_and_clones_speech(self):
+        stub = Stub(delay_s=0.3)
+        self.addCleanup(stub.close)
+        report = await hw_live.run(stub.url, phrases=("привет",), parallel=4, cycle=True,
+                                   genome=Genome(sleep_s=0.5))
+        self.assertEqual(report["сон"]["фаза"], "бодрствование")
+        self.assertIn("речь-2", report["сон"]["потоки"])
+        self.assertEqual(report["пачка_после_сна"]["запросов"], 4)
+        json.dumps(report, ensure_ascii=False, default=str)
 
     def test_main_without_server(self):
         err = io.StringIO()

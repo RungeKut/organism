@@ -74,6 +74,18 @@ class GraphTest(unittest.TestCase):
         self.assertEqual(self.graph.route("п", "речь"), "р1")
         self.assertIsNone(self.graph.route("п", "нет такой"))
 
+    def test_route_skips_busy_clone(self):
+        self.graph.announce("р", ("речь",))
+        self.graph.announce("р-2", ("речь",))
+        self.graph.edge("п", "р").w = 0.5
+        load = {"р": 0, "р-2": 0}
+        self.graph.load = load.get
+        self.assertEqual(self.graph.route("п", "речь"), "р")
+        load["р"] = 1
+        self.assertEqual({self.graph.route("п", "речь") for _ in range(20)}, {"р-2"})
+        load["р-2"] = 1
+        self.assertEqual({self.graph.route("п", "речь") for _ in range(20)}, {"р"})
+
 
 class StemTest(unittest.TestCase):
     def setUp(self):

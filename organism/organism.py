@@ -56,6 +56,7 @@ class Organism:
         self.ctx = Ctx(self.territory, self.genome, self.stem, self.graph, self.bus, self.journal, self.llm,
                        self.workspace, self.executor, self.body, clock=clock)
         self.streams: dict[str, Stream] = self.ctx.streams
+        self.graph.load = lambda name: self.streams[name].load if name in self.streams else 0
         self.reflexes = self.ctx.reflexes = ReflexCache(self.state / "reflexes.json")
         mother_llm = self.llm
         if self.territory.mother_url:

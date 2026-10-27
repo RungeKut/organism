@@ -10,7 +10,8 @@
 | [30_review_wave1.md](30_review_wave1.md) | правишь сон, рефлексы, поколения или специалистов; ищешь известные риски |
 | [40_hardware_plan.md](40_hardware_plan.md) | готовишь или разбираешь проверки на арендованном сервере; решаешь числа для territory.json |
 | [41_hw_results.md](41_hw_results.md) | нужны итоги замеров на сервере, шаги 2–4 |
-| [42_hw_results_2.md](42_hw_results_2.md) | итоги шага 5 и дальше; группы процессоров Windows, `win_group.py` |
+| [42_hw_results_2.md](42_hw_results_2.md) | итоги шагов 5–6; группы процессоров Windows, `win_group.py`, узлы и память |
+| [43_hw_results_3.md](43_hw_results_3.md) | итоги шага 7 и дальше; A3B в организме, пачка, слоты и клоны |
 | [00_rules/token-economy.md](00_rules/token-economy.md) | планирование работы, запуск субагентов, контекст разросся |
 | [00_rules/agents.md](00_rules/agents.md) | постановка задачи агенту |
 | [00_rules/compact.md](00_rules/compact.md) | готовимся к компакту |
