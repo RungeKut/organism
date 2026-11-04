@@ -13,9 +13,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from organism import proposals
+from organism.events import Event
 from organism.config import Genome, Territory
 from organism.llm import AIMD, LlamaCpp
 from organism.organism import Organism
+
+
+ASKED = ["Составь короткий договор аренды склада.", "Посчитай маржу: закупка 70, продажа 100, налог 6%.",
+         "Как проверить, что pull request безопасен?", "Переведи на английский: «срок поставки изменён».",
+         "Выполни команду проверки версии git."]
 
 
 async def run(url: str, rounds: int, llm=None) -> dict:
@@ -25,6 +31,10 @@ async def run(url: str, rounds: int, llm=None) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         state = Path(tmp)
         org = Organism(state, llm, territory, Genome())
+        for text in ASKED:
+            org.journal.event(Event("вход", "пользователь", {"text": text}))
+        for kind in ("отклонено", "просрочено", "просрочено"):
+            org.journal.action(kind, False, {})
         for _ in range(rounds):
             t0 = time.perf_counter()
             n0 = len(org.journal.all_events_since(0))
