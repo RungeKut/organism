@@ -205,6 +205,8 @@ class Organism:
         except Exception as e:
             self.journal.action("сбой", False, {"сон": f"{type(e).__name__}: {e}"})
         finally:
+            if self.territory.sense_keep_hours > 0:
+                self.journal.prune_events("ощущение", time.time() - self.territory.sense_keep_hours * 3600.0)
             self.stem.sleep_done()
 
     async def _breed(self) -> None:

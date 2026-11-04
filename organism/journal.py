@@ -65,5 +65,9 @@ class Journal:
         rows = self.db.execute("SELECT t, kind, ok, detail FROM actions WHERE t >= ? ORDER BY id", (t0,))
         return [(t, kind, bool(ok), json.loads(d)) for t, kind, ok, d in rows]
 
+    def prune_events(self, topic: str, older_than_t: float) -> int:
+        cur = self.db.execute("DELETE FROM events WHERE topic = ? AND t < ?", (topic, older_than_t))
+        return cur.rowcount
+
     def close(self) -> None:
         self.db.close()
