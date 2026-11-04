@@ -6,7 +6,7 @@ import json
 import tempfile
 import urllib.request
 
-from . import generations, proposals
+from . import generations, holdout, proposals
 from .body import inventory
 from .config import ROOT, Genome, Territory
 from .llm import AIMD, LLM, FakeLLM, LlamaCpp
@@ -26,7 +26,8 @@ def pick_llm(territory: Territory, fake: bool) -> LLM:
 
 
 async def chat(org: Organism) -> None:
-    print("Команды: /состояние, /плюс, /минус, /выход")
+    print("Команды: /состояние, /плюс, /минус, /эталон, /выход")
+    last = ""
     while True:
         try:
             line = (await asyncio.to_thread(input, "> ")).strip()
@@ -38,7 +39,10 @@ async def chat(org: Organism) -> None:
             print(json.dumps(org.snapshot(), ensure_ascii=False, indent=2))
         elif line in ("/плюс", "/минус"):
             org.feedback(1.0 if line == "/плюс" else -1.0)
+        elif line == "/эталон":
+            print("в эталон добавлено" if last and holdout.add(org.state, last) else "нечего добавлять")
         elif line:
+            last = line
             reply = await org.say(line)
             print(reply if reply is not None else f"[{org.stem.phase.value}] ответа нет")
 

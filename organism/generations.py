@@ -84,14 +84,23 @@ def select(scored: list[tuple[float, Genome]], parent_score: float,
 
 
 async def breed(parent: Genome, texts: list[str], llm: LLM, rng, n: int = 2,
-                max_children: int = 1, rate: float = 0.2, margin: float = 0.0) -> tuple[float, list[tuple[float, Genome]]]:
+                max_children: int = 1, rate: float = 0.2, margin: float = 0.0,
+                holdout: list[str] | None = None) -> tuple[float, list[tuple[float, Genome]]]:
     with tempfile.TemporaryDirectory(prefix="поколение-") as work:
         base = await trial(parent, texts, llm, Path(work) / "родитель")
         scored = []
         for k in range(n):
             kid = mutate(parent, rng, rate)
             scored.append((await trial(kid, texts, llm, Path(work) / f"потомок-{k}"), kid))
-    return base, select(scored, base, max_children, margin)
+        chosen = select(scored, base, max_children, margin)
+        if chosen and holdout:
+            hold_base = await trial(parent, holdout, llm, Path(work) / "эталон-родитель")
+            kept = []
+            for k, (score, kid) in enumerate(chosen):
+                if await trial(kid, holdout, llm, Path(work) / f"эталон-{k}") >= hold_base - margin:
+                    kept.append((score, kid))
+            chosen = kept
+    return base, chosen
 
 
 def propose(state: Path, parent: Genome, kids: list[Genome], scores: list[float] | None = None,

@@ -210,13 +210,15 @@ class Organism:
             self.stem.sleep_done()
 
     async def _breed(self) -> None:
-        from . import generations
-        texts = generations.inputs(self.journal, self.wake_wall)[:8]
+        from . import generations, holdout
+        held = holdout.load(self.state)
+        texts = [t for t in generations.inputs(self.journal, self.wake_wall) if t not in held][:8]
         if not texts:
             return
         base, kids = await generations.breed(self.genome, texts, self.llm, self.rng,
                                              max_children=self.territory.max_children,
-                                             margin=self.territory.generation_margin)
+                                             margin=self.territory.generation_margin,
+                                             holdout=holdout.sample(self.state))
         if kids:
             generations.propose(self.state, self.genome, [k for _, k in kids], [s for s, _ in kids],
                                 self.territory.max_children)
