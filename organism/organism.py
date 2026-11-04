@@ -217,20 +217,23 @@ class Organism:
             self.stem.sleep_done()
 
     async def _architect(self) -> None:
-        from . import architect, holdout, proposals
+        from . import architect, proposals
         path = ROOT / "config" / "professions.json"
         before = path.read_text(encoding="utf-8") if path.exists() else "[]"
         summary = "\n".join(self.journal.memories("сон", 3) + [json.dumps(dict(self.ctx.stats), ensure_ascii=False)])
         after = await architect.propose_text(self.llm, before, summary)
         reserved = RESERVED | frozenset(STREAM_TYPES)
         row = architect.changed(before, after, reserved) if after else None
-        texts = holdout.sample(self.state)
-        if row is None or not texts or after == before:
-            self.journal.event(Event("архитектор_без_предложения", "ствол", {"эталон": len(texts)}))
+        if row is None or after == before:
+            self.journal.event(Event("архитектор_без_предложения", "ствол", {}))
+            return
+        texts = await architect.questions(self.llm, row)
+        if not texts:
+            self.journal.event(Event("архитектор_без_предложения", "ствол", {"вопросов": 0}))
             return
         parent = await architect.score(self.llm, self.mother, architect.BASELINE, texts)
         child = await architect.score(self.llm, self.mother, row["prompt"], texts)
-        if child <= parent + self.territory.generation_margin:
+        if child <= parent + max(architect.MARGIN, self.territory.generation_margin):
             self.journal.event(Event("архитектор_не_лучше", "ствол", {"профессия": row["name"],
                                                                     "основа": round(parent, 3), "новая": round(child, 3)}))
             return

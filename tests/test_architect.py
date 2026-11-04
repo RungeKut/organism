@@ -40,6 +40,16 @@ class ChangedTest(unittest.TestCase):
         self.assertIsNone(architect.extract("[не json]"))
 
 
+class QuestionsTest(unittest.IsolatedAsyncioTestCase):
+    async def test_questions_parsed_from_lines(self):
+        class Q(LLM):
+            async def chat(self, messages, max_tokens=256, lora=None, deadline_s=None):
+                return "\n".join(["1. Что такое рынок?", "- Как считать маржу?", "", "а", "3) Зачем нужен бюджет?", "лишний вопрос здесь"])
+
+        got = await architect.questions(Q(), GOOD)
+        self.assertEqual(got, ["Что такое рынок?", "Как считать маржу?", "Зачем нужен бюджет?"])
+
+
 class Scripted(LLM):
     def __init__(self, answer: str, good_for_profession: bool):
         self.answer = answer

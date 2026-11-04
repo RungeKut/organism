@@ -12,14 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from organism import holdout, proposals
+from organism import proposals
 from organism.config import Genome, Territory
 from organism.llm import AIMD, LlamaCpp
 from organism.organism import Organism
-
-SEED = ["Привет! Расскажи, кто ты и что умеешь.", "Что мы обсуждали в прошлый раз?",
-        "Объясни простыми словами, зачем тебе сон.", "Какая у тебя сейчас цель?",
-        "Сколько тебе нужно времени, чтобы ответить на сложный вопрос, и почему?"]
 
 
 async def run(url: str, rounds: int, llm=None) -> dict:
@@ -28,8 +24,6 @@ async def run(url: str, rounds: int, llm=None) -> dict:
     report = {"раунды": []}
     with tempfile.TemporaryDirectory() as tmp:
         state = Path(tmp)
-        for text in SEED:
-            holdout.add(state, text)
         org = Organism(state, llm, territory, Genome())
         for _ in range(rounds):
             t0 = time.perf_counter()

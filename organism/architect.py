@@ -14,6 +14,9 @@ SYSTEM = ("Ты архитектор организма. Тебе дан спи�
           "Поля профессии: name (одно слово), prompt (до 600 знаков), lora_id: null, tools: []. "
           "Ответь только полным JSON-списком профессий.")
 BASELINE = "Ты помощник. Отвечай коротко и по делу."
+QUESTIONS = 3
+REPEATS = 2
+MARGIN = 0.15
 
 
 def _load(text: str) -> list[dict] | None:
@@ -62,9 +65,21 @@ async def propose_text(llm: LLM, before: str, summary: str) -> str | None:
     return extract(raw)
 
 
+async def questions(llm: LLM, row: dict) -> list[str]:
+    ask = (f"Профессия «{row['name']}»: {row['prompt']}\nПридумай {QUESTIONS} коротких вопроса из её области, "
+           "по одному в строке, без нумерации.")
+    try:
+        raw = await llm.chat([{"role": "system", "content": "Составляй вопросы для проверки."},
+                              {"role": "user", "content": ask}], max_tokens=150)
+    except (LLMError, PermissionError):
+        return []
+    lines = [ln.strip(" -*\t0123456789.)") for ln in raw.splitlines()]
+    return [ln for ln in lines if len(ln) > 3][:QUESTIONS]
+
+
 async def score(llm: LLM, mother: Mother, prompt: str, texts: list[str]) -> float:
     grades = []
-    for text in texts:
+    for text in [t for t in texts for _ in range(REPEATS)]:
         try:
             raw = await llm.chat([{"role": "system", "content": prompt}, {"role": "user", "content": text}],
                                  max_tokens=200)
