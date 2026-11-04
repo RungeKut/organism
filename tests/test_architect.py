@@ -94,3 +94,11 @@ class ArchitectOrganismTest(unittest.IsolatedAsyncioTestCase):
         topics, pending = await self.run_architect(Scripted("не знаю", True))
         self.assertIn("архитектор_без_предложения", topics)
         self.assertEqual(pending, [])
+
+
+class SummaryTest(unittest.TestCase):
+    def test_summary_has_failures_and_questions(self):
+        text = architect.summary(["сон 1"], {"сбой_llm": 2}, ["а", "б" * 200], {"отклонено": 3})
+        for part in ("сон 1", "сбой_llm", "отклонено", "а;"):
+            self.assertIn(part, text)
+        self.assertNotIn("б" * 100, text)

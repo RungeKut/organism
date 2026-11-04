@@ -220,8 +220,14 @@ class Organism:
         from . import architect, proposals
         path = ROOT / "config" / "professions.json"
         before = path.read_text(encoding="utf-8") if path.exists() else "[]"
-        summary = "\n".join(self.journal.memories("сон", 3) + [json.dumps(dict(self.ctx.stats), ensure_ascii=False)])
-        after = await architect.propose_text(self.llm, before, summary)
+        failures: dict[str, int] = {}
+        for _, kind, ok, _ in self.journal.all_actions_since(0):
+            if not ok:
+                failures[kind] = failures.get(kind, 0) + 1
+        asked = [p["text"] for _, source, p in self.journal.events_since(0, "вход")
+                 if source == "пользователь" and isinstance(p.get("text"), str)]
+        after = await architect.propose_text(self.llm, before, architect.summary(
+            self.journal.memories("сон", 3), dict(self.ctx.stats), asked, failures))
         reserved = RESERVED | frozenset(STREAM_TYPES)
         row = architect.changed(before, after, reserved) if after else None
         if row is None or after == before:

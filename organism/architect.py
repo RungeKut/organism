@@ -11,6 +11,7 @@ MAX_PROMPT = 600
 NAME = re.compile(r"^[\w]+$")
 SYSTEM = ("Ты архитектор организма. Тебе дан список профессий (JSON) и сводка работы. "
           "Предложи ровно одно изменение: добавь одну профессию или перепиши промпт одной существующей. "
+          "Профессия нужна для задач, с которыми организм справляется плохо (см. сводку); имя по-русски, одно слово, не «архитектор». "
           "Поля профессии: name (одно слово), prompt (до 600 знаков), lora_id: null, tools: []. "
           "Ответь только полным JSON-списком профессий.")
 BASELINE = "Ты помощник. Отвечай коротко и по делу."
@@ -53,6 +54,15 @@ def changed(before: str, after: str, reserved: frozenset[str]) -> dict | None:
     diff = [r for r in new if old_by.get(r["name"]) != r]
     removed = set(old_by) - {r["name"] for r in new}
     return diff[0] if len(diff) == 1 and not removed else None
+
+
+def summary(memories: list[str], stats: dict, inputs: list[str], failures: dict) -> str:
+    asked = "; ".join(t[:80] for t in inputs[-5:]) or "нет"
+    dreams = " | ".join(memories) or "нет"
+    return "\n".join([f"Последние сны: {dreams}",
+                      f"Счётчики: {json.dumps(stats, ensure_ascii=False)}",
+                      f"Сбои по видам: {json.dumps(failures, ensure_ascii=False)}",
+                      f"Последние вопросы людей: {asked}"])
 
 
 async def propose_text(llm: LLM, before: str, summary: str) -> str | None:
