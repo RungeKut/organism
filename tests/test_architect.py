@@ -61,7 +61,7 @@ class Scripted(LLM):
             return self.answer
         if system.startswith("Оцени"):
             return "0.9" if "хороший" in last else "0.4"
-        if system == GOOD["prompt"]:
+        if system.startswith(GOOD["prompt"]):
             return "хороший ответ" if self.good else "плохой ответ"
         return "плохой ответ"
 

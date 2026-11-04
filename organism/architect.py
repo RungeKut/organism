@@ -14,7 +14,8 @@ SYSTEM = ("Ты архитектор организма. Тебе дан спи�
           "Профессия нужна для задач, с которыми организм справляется плохо (см. сводку); имя по-русски, одно слово, не «архитектор». "
           "Поля профессии: name (одно слово), prompt (до 600 знаков), lora_id: null, tools: []. "
           "Ответь только полным JSON-списком профессий.")
-BASELINE = "Ты помощник. Отвечай коротко и по делу."
+BASELINE = "Ты помощник."
+BREVITY = "Отвечай коротко и по делу, не больше пяти предложений."
 QUESTIONS = 3
 REPEATS = 2
 MARGIN = 0.15
@@ -91,7 +92,7 @@ async def score(llm: LLM, mother: Mother, prompt: str, texts: list[str]) -> floa
     grades = []
     for text in [t for t in texts for _ in range(REPEATS)]:
         try:
-            raw = await llm.chat([{"role": "system", "content": prompt}, {"role": "user", "content": text}],
+            raw = await llm.chat([{"role": "system", "content": f"{prompt} {BREVITY}"}, {"role": "user", "content": text}],
                                  max_tokens=200)
         except (LLMError, PermissionError):
             continue
