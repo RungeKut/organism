@@ -213,7 +213,8 @@ class Organism:
         if not texts:
             return
         base, kids = await generations.breed(self.genome, texts, self.llm, self.rng,
-                                             max_children=self.territory.max_children)
+                                             max_children=self.territory.max_children,
+                                             margin=self.territory.generation_margin)
         if kids:
             generations.propose(self.state, self.genome, [k for _, k in kids], [s for s, _ in kids],
                                 self.territory.max_children)

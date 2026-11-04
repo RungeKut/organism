@@ -78,20 +78,20 @@ async def trial(g: Genome, texts: list[str], llm: LLM, tmp: Path) -> float:
 
 
 def select(scored: list[tuple[float, Genome]], parent_score: float,
-           max_children: int = 1) -> list[tuple[float, Genome]]:
-    better = sorted((s for s in scored if s[0] > parent_score), key=lambda s: s[0], reverse=True)
+           max_children: int = 1, margin: float = 0.0) -> list[tuple[float, Genome]]:
+    better = sorted((s for s in scored if s[0] > parent_score + margin), key=lambda s: s[0], reverse=True)
     return better[:max(0, max_children)]
 
 
 async def breed(parent: Genome, texts: list[str], llm: LLM, rng, n: int = 2,
-                max_children: int = 1, rate: float = 0.2) -> tuple[float, list[tuple[float, Genome]]]:
+                max_children: int = 1, rate: float = 0.2, margin: float = 0.0) -> tuple[float, list[tuple[float, Genome]]]:
     with tempfile.TemporaryDirectory(prefix="поколение-") as work:
         base = await trial(parent, texts, llm, Path(work) / "родитель")
         scored = []
         for k in range(n):
             kid = mutate(parent, rng, rate)
             scored.append((await trial(kid, texts, llm, Path(work) / f"потомок-{k}"), kid))
-    return base, select(scored, base, max_children)
+    return base, select(scored, base, max_children, margin)
 
 
 def propose(state: Path, parent: Genome, kids: list[Genome], scores: list[float] | None = None,

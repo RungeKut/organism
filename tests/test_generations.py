@@ -166,6 +166,11 @@ class GateTest(unittest.TestCase):
         self.assertEqual(len(gen.select(scored, 0.5, max_children=2)), 2)
         self.assertEqual(gen.select(scored, 0.9, max_children=3), [])
 
+    def test_select_margin_filters_noise(self):
+        scored = [(0.51, self.kids[0]), (0.8, self.kids[1])]
+        self.assertEqual(gen.select(scored, 0.5, margin=0.03), [(0.8, self.kids[1])])
+        self.assertEqual(gen.select(scored, 0.5, margin=0.5), [])
+
 
 if __name__ == "__main__":
     unittest.main()
