@@ -33,6 +33,7 @@ class Territory:
     generation_every_sleeps: int = 0
     breed_timeout_s: float = 600.0
     generation_margin: float = 0.03
+    sense_keep_hours: float = 6.0
 
     @classmethod
     def load(cls, path: Path) -> Territory:
