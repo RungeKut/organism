@@ -68,8 +68,10 @@ def propose(state: Path, kind: str, target: str, before: str, after: str,
 
 
 def decide(state: Path, proposal_id: str, token: str, accept: bool, reason: str = "") -> bool:
+    if not isinstance(token, str) or not isinstance(proposal_id, str) or not proposal_id.isalnum():
+        return False
     path = Path(state) / PROPOSALS_DIR / f"{proposal_id}.json"
-    if not isinstance(token, str) or not path.exists():
+    if not path.exists():
         return False
     data = json.loads(path.read_text(encoding="utf-8"))
     if not secrets.compare_digest(str(data.get("token", "")).encode(), token.encode()):

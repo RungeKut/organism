@@ -105,5 +105,12 @@ class ProposalsTest(unittest.TestCase):
         self.assertFalse(pr.decide(self.state, d1["id"], d1["token"], accept=True))
 
 
+    def test_decide_rejects_path_like_id(self):
+        outside = self.state / "x.json"
+        outside.write_text("{}", encoding="utf-8")
+        self.assertFalse(pr.decide(self.state, "../x", "t", accept=True))
+        self.assertTrue(outside.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
