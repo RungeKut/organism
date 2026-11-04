@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import json
 import random
 import time
 from pathlib import Path
@@ -200,6 +201,12 @@ class Organism:
                     await asyncio.wait_for(self._breed(), self.territory.breed_timeout_s)
                 except asyncio.TimeoutError:
                     self.journal.action("сбой", False, {"сон": "поколение: таймаут"})
+            every = self.territory.architect_every_sleeps
+            if every and self.sleeps % every == 0:
+                try:
+                    await asyncio.wait_for(self._architect(), self.territory.breed_timeout_s)
+                except asyncio.TimeoutError:
+                    self.journal.action("сбой", False, {"сон": "архитектор: таймаут"})
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -208,6 +215,28 @@ class Organism:
             if self.territory.sense_keep_hours > 0:
                 self.journal.prune_events("ощущение", time.time() - self.territory.sense_keep_hours * 3600.0)
             self.stem.sleep_done()
+
+    async def _architect(self) -> None:
+        from . import architect, holdout, proposals
+        path = ROOT / "config" / "professions.json"
+        before = path.read_text(encoding="utf-8") if path.exists() else "[]"
+        summary = "\n".join(self.journal.memories("сон", 3) + [json.dumps(dict(self.ctx.stats), ensure_ascii=False)])
+        after = await architect.propose_text(self.llm, before, summary)
+        reserved = RESERVED | frozenset(STREAM_TYPES)
+        row = architect.changed(before, after, reserved) if after else None
+        texts = holdout.sample(self.state)
+        if row is None or not texts or after == before:
+            self.journal.event(Event("архитектор_без_предложения", "ствол", {"эталон": len(texts)}))
+            return
+        parent = await architect.score(self.llm, self.mother, architect.BASELINE, texts)
+        child = await architect.score(self.llm, self.mother, row["prompt"], texts)
+        if child <= parent + self.territory.generation_margin:
+            self.journal.event(Event("архитектор_не_лучше", "ствол", {"профессия": row["name"],
+                                                                    "основа": round(parent, 3), "новая": round(child, 3)}))
+            return
+        proposals.propose(self.state, "профессия", "professions.json", before, after, parent, child,
+                          f"архитектор: {row['name']}")
+        self.journal.event(Event("архитектор_предложил", "ствол", {"профессия": row["name"]}))
 
     async def _breed(self) -> None:
         from . import generations, holdout

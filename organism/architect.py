@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import json
+import re
+
+from .llm import LLM, LLMError
+from .mother import Mother
+
+MAX_PROFESSIONS = 8
+MAX_PROMPT = 600
+NAME = re.compile(r"^[\w]+$")
+SYSTEM = ("Ты архитектор организма. Тебе дан список профессий (JSON) и сводка работы. "
+          "Предложи ровно одно изменение: добавь одну профессию или перепиши промпт одной существующей. "
+          "Поля профессии: name (одно слово), prompt (до 600 знаков), lora_id: null, tools: []. "
+          "Ответь только полным JSON-списком профессий.")
+BASELINE = "Ты помощник. Отвечай коротко и по делу."
+
+
+def _load(text: str) -> list[dict] | None:
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return data if isinstance(data, list) and all(isinstance(r, dict) for r in data) else None
+
+
+def extract(raw: str) -> str | None:
+    start, end = raw.find("["), raw.rfind("]")
+    if start < 0 or end < start:
+        return None
+    rows = _load(raw[start:end + 1])
+    return None if rows is None else json.dumps(rows, ensure_ascii=False, indent=2)
+
+
+def changed(before: str, after: str, reserved: frozenset[str]) -> dict | None:
+    old, new = _load(before), _load(after)
+    if old is None or new is None or len(new) > MAX_PROFESSIONS:
+        return None
+    for row in new:
+        name, prompt = row.get("name"), row.get("prompt")
+        if not isinstance(name, str) or not NAME.match(name) or name in reserved:
+            return None
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_PROMPT:
+            return None
+        if row.get("lora_id") is not None or row.get("tools", []) != []:
+            return None
+    if len({r["name"] for r in new}) != len(new):
+        return None
+    old_by = {r.get("name"): r for r in old}
+    diff = [r for r in new if old_by.get(r["name"]) != r]
+    removed = set(old_by) - {r["name"] for r in new}
+    return diff[0] if len(diff) == 1 and not removed else None
+
+
+async def propose_text(llm: LLM, before: str, summary: str) -> str | None:
+    try:
+        raw = await llm.chat([{"role": "system", "content": SYSTEM},
+                              {"role": "user", "content": f"Профессии:\n{before}\n\nСводка:\n{summary}"}],
+                             max_tokens=700)
+    except (LLMError, PermissionError):
+        return None
+    return extract(raw)
+
+
+async def score(llm: LLM, mother: Mother, prompt: str, texts: list[str]) -> float:
+    grades = []
+    for text in texts:
+        try:
+            raw = await llm.chat([{"role": "system", "content": prompt}, {"role": "user", "content": text}],
+                                 max_tokens=200)
+        except (LLMError, PermissionError):
+            continue
+        grade = await mother.rate(f"Вопрос: {text}\nОтвет: {raw.strip()}")
+        if grade is not None:
+            grades.append(grade)
+    return sum(grades) / len(grades) if grades else 0.0
