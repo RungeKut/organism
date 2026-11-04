@@ -13,7 +13,7 @@ from organism.workspace import Proposal
 
 
 def genome():
-    return Genome(tact_s=0.02, wake_s=1.2, sleep_s=0.3, drowsy_max_s=2.0, eta=0.5, explore=0.0)
+    return Genome(tact_s=0.02, wake_s=3.0, sleep_s=0.3, drowsy_max_s=4.0, eta=0.5, explore=0.0)
 
 
 def territory():

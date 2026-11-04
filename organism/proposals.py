@@ -5,6 +5,7 @@ import secrets
 import time
 from pathlib import Path
 
+APPLICABLE = frozenset({"professions.json"})
 PROPOSALS_DIR = "proposals"
 DECISIONS_FILE = "decisions.jsonl"
 
@@ -67,7 +68,26 @@ def propose(state: Path, kind: str, target: str, before: str, after: str,
     return path
 
 
-def decide(state: Path, proposal_id: str, token: str, accept: bool, reason: str = "") -> bool:
+def _apply(config: Path, data: dict) -> bool:
+    target = data["target"]
+    if target not in APPLICABLE:
+        return False
+    path = Path(config) / target
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    if current != data["before"]:
+        return False
+    try:
+        json.loads(data["after"])
+    except ValueError:
+        return False
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(data["after"], encoding="utf-8")
+    tmp.replace(path)
+    return True
+
+
+def decide(state: Path, proposal_id: str, token: str, accept: bool, reason: str = "",
+           config: Path | None = None) -> bool:
     if not isinstance(token, str) or not isinstance(proposal_id, str) or not proposal_id.isalnum():
         return False
     path = Path(state) / PROPOSALS_DIR / f"{proposal_id}.json"
@@ -75,6 +95,8 @@ def decide(state: Path, proposal_id: str, token: str, accept: bool, reason: str 
         return False
     data = json.loads(path.read_text(encoding="utf-8"))
     if not secrets.compare_digest(str(data.get("token", "")).encode(), token.encode()):
+        return False
+    if accept and config is not None and not _apply(config, data):
         return False
     decision = {
         "t": time.time(),

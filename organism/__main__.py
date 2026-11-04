@@ -6,7 +6,7 @@ import json
 import tempfile
 import urllib.request
 
-from . import generations
+from . import generations, proposals
 from .body import inventory
 from .config import ROOT, Genome, Territory
 from .llm import AIMD, LLM, FakeLLM, LlamaCpp
@@ -79,8 +79,21 @@ def main() -> None:
     parser.add_argument("--demo", action="store_true", help="короткий прогон бодрствование → сон → бодрствование")
     parser.add_argument("--body", action="store_true", help="показать карту тела и выйти")
     parser.add_argument("--approve", metavar="ТОКЕН", help="подтвердить смену поколения (организм остановлен)")
+    parser.add_argument("--proposals", action="store_true", help="показать ожидающие предложения (без токенов)")
+    parser.add_argument("--decide", nargs="+", metavar="ЗНАЧЕНИЕ",
+                        help="ID ТОКЕН да|нет [причина]: решить предложение (организм остановлен)")
     args = parser.parse_args()
-    if args.approve:
+    if args.proposals:
+        for row in proposals.pending(ROOT / "state"):
+            print(json.dumps({k: v for k, v in row.items() if k != "token"}, ensure_ascii=False))
+    elif args.decide:
+        if len(args.decide) < 3 or args.decide[2] not in ("да", "нет"):
+            print("формат: --decide ID ТОКЕН да|нет [причина]")
+        else:
+            ok = proposals.decide(ROOT / "state", args.decide[0], args.decide[1], args.decide[2] == "да",
+                                  " ".join(args.decide[3:]), config=ROOT / "config")
+            print("решение записано" if ok else "не принято: токен, номер или файл не подошли")
+    elif args.approve:
         print("смена поколения принята" if generations.approve(ROOT / "state", args.approve) else "токен не подошёл")
     elif args.body:
         print(json.dumps(inventory().__dict__, ensure_ascii=False, indent=2))

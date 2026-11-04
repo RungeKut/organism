@@ -112,5 +112,38 @@ class ProposalsTest(unittest.TestCase):
         self.assertTrue(outside.exists())
 
 
+    def test_accept_applies_whitelisted_target(self):
+        config = self.state / "config"
+        config.mkdir()
+        (config / "professions.json").write_text("[]", encoding="utf-8")
+        path = self.propose(target="professions.json", before="[]", after='[{"name": "x"}]')
+        d = self.read(path)
+        self.assertTrue(pr.decide(self.state, d["id"], d["token"], True, config=config))
+        self.assertEqual((config / "professions.json").read_text(encoding="utf-8"), '[{"name": "x"}]')
+
+    def test_apply_refused_for_territory_stale_and_bad_json(self):
+        config = self.state / "config"
+        config.mkdir()
+        (config / "territory.json").write_text("{}", encoding="utf-8")
+        (config / "professions.json").write_text("[1]", encoding="utf-8")
+        cases = [dict(target="territory.json", before="{}", after='{"allow_network": true}'),
+                 dict(target="professions.json", before="[]", after="[]"),
+                 dict(target="professions.json", before="[1]", after="не json")]
+        for kw in cases:
+            d = self.read(self.propose(**kw))
+            self.assertFalse(pr.decide(self.state, d["id"], d["token"], True, config=config))
+            self.assertTrue((self.state / "proposals" / f"{d['id']}.json").exists())
+        self.assertEqual((config / "territory.json").read_text(encoding="utf-8"), "{}")
+        self.assertEqual(pr.decisions(self.state), [])
+
+    def test_reject_never_touches_config(self):
+        config = self.state / "config"
+        config.mkdir()
+        (config / "professions.json").write_text("[]", encoding="utf-8")
+        d = self.read(self.propose(target="professions.json", before="[]", after="[1]"))
+        self.assertTrue(pr.decide(self.state, d["id"], d["token"], False, config=config))
+        self.assertEqual((config / "professions.json").read_text(encoding="utf-8"), "[]")
+
+
 if __name__ == "__main__":
     unittest.main()
