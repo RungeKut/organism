@@ -59,8 +59,9 @@ class Scripted(LLM):
         system, last = messages[0]["content"], messages[-1]["content"]
         if system == architect.SYSTEM:
             return self.answer
-        if system.startswith("Оцени"):
-            return "0.9" if "хороший" in last else "0.4"
+        if system.startswith("Сравни"):
+            tail = last.rsplit("Ответ 2:", 1)[1] if "Ответ 2:" in last else ""
+            return "2" if "хороший" in tail else "1"
         if system.startswith(GOOD["prompt"]):
             return "хороший ответ" if self.good else "плохой ответ"
         return "плохой ответ"

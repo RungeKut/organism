@@ -94,6 +94,8 @@ class FakeLLM(LLM):
         await asyncio.sleep(self.delay_s)
         system = messages[0]["content"] if messages and messages[0]["role"] == "system" else ""
         last = messages[-1]["content"]
+        if "Сравни" in system:
+            return "1"
         if "Оцени" in system:
             return "0.8"
         if "Сожми" in system:
