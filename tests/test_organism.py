@@ -75,6 +75,26 @@ class OrganismTest(unittest.IsolatedAsyncioTestCase):
         faults = [d for _, kind, _, d in self.org.journal.all_actions_since(0) if kind == "сбой"]
         self.assertIn({"сон": "поколение: таймаут"}, faults)
 
+    async def test_breed_excludes_holdout_from_texts(self):
+        from organism import generations, holdout
+        await self.org.say("обычная фраза")
+        await self.org.say("эталонная фраза")
+        holdout.add(self.org.state, "эталонная фраза")
+        seen = {}
+
+        async def fake_breed(parent, texts, llm, rng, **kw):
+            seen["texts"], seen["holdout"] = list(texts), kw.get("holdout")
+            return 1.0, []
+
+        orig = generations.breed
+        generations.breed = fake_breed
+        try:
+            await self.org._breed()
+        finally:
+            generations.breed = orig
+        self.assertEqual(seen["texts"], ["обычная фраза"])
+        self.assertEqual(seen["holdout"], ["эталонная фраза"])
+
     async def test_slow_llm_misses_deadline(self):
         self.org.llm.delay_s = 0.5
         self.org.streams["речь"].deadline_s = 0.1
