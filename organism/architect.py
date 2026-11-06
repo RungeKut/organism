@@ -17,8 +17,7 @@ SYSTEM = ("Ты архитектор организма. Тебе дан спи�
 BASELINE = "Ты помощник."
 BREVITY = "Отвечай коротко и по делу, не больше пяти предложений."
 QUESTIONS = 3
-REPEATS = 2
-MARGIN = 0.15
+WIN = 0.75
 
 
 def _load(text: str) -> list[dict] | None:
@@ -88,15 +87,24 @@ async def questions(llm: LLM, row: dict) -> list[str]:
     return [ln for ln in lines if len(ln) > 3][:QUESTIONS]
 
 
-async def score(llm: LLM, mother: Mother, prompt: str, texts: list[str]) -> float:
-    grades = []
-    for text in [t for t in texts for _ in range(REPEATS)]:
-        try:
-            raw = await llm.chat([{"role": "system", "content": f"{prompt} {BREVITY}"}, {"role": "user", "content": text}],
-                                 max_tokens=200)
-        except (LLMError, PermissionError):
+async def _answer(llm: LLM, prompt: str, text: str) -> str | None:
+    try:
+        raw = await llm.chat([{"role": "system", "content": f"{prompt} {BREVITY}"}, {"role": "user", "content": text}],
+                             max_tokens=200)
+    except (LLMError, PermissionError):
+        return None
+    return raw.strip()
+
+
+async def duel(llm: LLM, mother: Mother, base_prompt: str, new_prompt: str, texts: list[str]) -> float:
+    wins, parsed = 0.0, 0
+    for text in texts:
+        base = await _answer(llm, base_prompt, text)
+        new = await _answer(llm, new_prompt, text)
+        if base is None or new is None:
             continue
-        grade = await mother.rate(f"Вопрос: {text}\nОтвет: {raw.strip()}")
-        if grade is not None:
-            grades.append(grade)
-    return sum(grades) / len(grades) if grades else 0.0
+        share = await mother.compare(text, base, new)
+        if share is not None:
+            wins += share
+            parsed += 1
+    return wins / parsed if parsed else 0.5

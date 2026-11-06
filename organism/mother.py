@@ -9,6 +9,7 @@ from .config import Genome
 from .llm import LLM, LLMError
 
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+CHOICE = re.compile(r"[12]")
 
 
 class Mother:
@@ -35,6 +36,24 @@ class Mother:
             return None
         m = NUMBER.search(raw)
         return min(1.0, max(0.0, float(m.group().replace(",", ".")))) if m else None
+
+    async def compare(self, question: str, first: str, second: str) -> float | None:
+        system = "Сравни два ответа на вопрос по полезности и точности. Ответь одной цифрой: 1 или 2."
+        wins, parsed = 0, 0
+        try:
+            for i, (a, b) in enumerate(((first, second), (second, first))):
+                raw = await self.llm.chat([{"role": "system", "content": system},
+                                           {"role": "user", "content": f"Вопрос: {question}\nОтвет 1: {a}\nОтвет 2: {b}"}],
+                                          max_tokens=8)
+                m = CHOICE.search(raw)
+                if m is None:
+                    continue
+                parsed += 1
+                if m.group() == ("2" if i == 0 else "1"):
+                    wins += 1
+        except (LLMError, PermissionError):
+            return None
+        return wins / parsed if parsed else None
 
     async def summarize(self, transcript: str) -> str | None:
         system = "Сожми разговор в одну короткую заметку для памяти."

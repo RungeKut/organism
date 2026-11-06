@@ -237,14 +237,13 @@ class Organism:
         if not texts:
             self.journal.event(Event("архитектор_без_предложения", "ствол", {"вопросов": 0}))
             return
-        parent = await architect.score(self.llm, self.mother, architect.BASELINE, texts)
-        child = await architect.score(self.llm, self.mother, row["prompt"], texts)
-        if child <= parent + max(architect.MARGIN, self.territory.generation_margin):
+        p = await architect.duel(self.llm, self.mother, architect.BASELINE, row["prompt"], texts)
+        if p < architect.WIN:
             self.journal.event(Event("архитектор_не_лучше", "ствол", {"профессия": row["name"],
-                                                                    "основа": round(parent, 3), "новая": round(child, 3)}))
+                                                                    "доля_побед": round(p, 3)}))
             return
-        proposals.propose(self.state, "профессия", "professions.json", before, after, parent, child,
-                          f"архитектор: {row['name']}")
+        proposals.propose(self.state, "профессия", "professions.json", before, after,
+                          round(1 - p, 3), round(p, 3), f"архитектор: {row['name']}")
         self.journal.event(Event("архитектор_предложил", "ствол", {"профессия": row["name"]}))
 
     async def _breed(self) -> None:
