@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import json
 import random
 import tempfile
@@ -99,9 +100,21 @@ class TrialTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_breed_respects_max_children(self):
         h0 = digest()
-        base, kids = await gen.breed(fast(), ["привет"], FakeLLM(), random.Random(5), n=2, max_children=1)
-        self.assertLessEqual(len(kids), 1)
-        self.assertTrue(all(s > base for s, _ in kids))
+        scores = itertools.cycle([1.0, 1.5, 2.0, 0.5])
+
+        async def fake_trial(g, texts, llm, tmp):
+            return next(scores)
+
+        orig = gen.trial
+        gen.trial = fake_trial
+        try:
+            for cap, expected in ((1, [2.0]), (2, [2.0, 1.5]), (0, [])):
+                base, kids = await gen.breed(fast(), ["привет"], FakeLLM(), random.Random(5), n=3,
+                                             max_children=cap)
+                self.assertEqual(base, 1.0)
+                self.assertEqual([s for s, _ in kids], expected)
+        finally:
+            gen.trial = orig
         self.assertEqual(digest(), h0)
 
 
@@ -155,6 +168,21 @@ class GateTest(unittest.TestCase):
         self.assertFalse(gen.approve(self.state, token))
         self.assertEqual(digest(), h0)
         self.assertEqual(Territory.load(TERRITORY), t0)
+
+    def test_approve_by_index(self):
+        path = gen.propose(self.state, self.parent, self.kids, [0.1, 0.9, 0.5], max_children=2)
+        token = json.loads(path.read_text(encoding="utf-8"))["token"]
+        self.assertTrue(gen.approve(self.state, token, index=1))
+        self.assertFalse(path.exists())
+        self.assertEqual(asdict(Genome.load(self.state / "genome.json")), asdict(self.kids[2]))
+
+    def test_approve_bad_index_changes_nothing(self):
+        path = gen.propose(self.state, self.parent, self.kids, [0.1, 0.9, 0.5], max_children=2)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for bad in (5, -1):
+            self.assertFalse(gen.approve(self.state, data["token"], index=bad))
+        self.assertTrue(path.exists())
+        self.assertEqual((self.state / "genome.json").read_bytes(), self.original)
 
     def test_approve_without_pending(self):
         self.assertFalse(gen.approve(self.state, "abc"))

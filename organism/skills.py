@@ -27,9 +27,9 @@ def mine(j: Journal, t0: float, min_count: int = 3) -> list[Chain]:
     texts: dict[str, str] = {}
     cmds: dict[str, list[str]] = defaultdict(list)
     oks: dict[str, list[bool]] = defaultdict(list)
-    for _, topic, _, payload in j.all_events_since(t0):
+    for _, _, payload in j.events_since(t0, "вход"):
         ep = payload.get("episode")
-        if ep and topic == "вход" and ep not in texts:
+        if ep and ep not in texts:
             key = normalize(str(payload.get("text", "")))
             if key:
                 texts[ep] = key
