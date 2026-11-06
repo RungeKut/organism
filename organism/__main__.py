@@ -82,7 +82,10 @@ def main() -> None:
     parser.add_argument("--fake", action="store_true", help="не ходить в llama.cpp, говорить заглушкой")
     parser.add_argument("--demo", action="store_true", help="короткий прогон бодрствование → сон → бодрствование")
     parser.add_argument("--body", action="store_true", help="показать карту тела и выйти")
-    parser.add_argument("--approve", metavar="ТОКЕН", help="подтвердить смену поколения (организм остановлен)")
+    parser.add_argument("--approve", nargs="+", metavar="ЗНАЧЕНИЕ",
+                        help="ТОКЕН [НОМЕР]: подтвердить смену поколения, номер выбирает ребёнка (организм остановлен)")
+    parser.add_argument("--generation", action="store_true",
+                        help="показать ожидающих детей смены поколения (без токена)")
     parser.add_argument("--proposals", action="store_true", help="показать ожидающие предложения (без токенов)")
     parser.add_argument("--decide", nargs="+", metavar="ЗНАЧЕНИЕ",
                         help="ID ТОКЕН да|нет [причина]: решить предложение (организм остановлен)")
@@ -98,7 +101,28 @@ def main() -> None:
                                   " ".join(args.decide[3:]), config=ROOT / "config")
             print("решение записано" if ok else "не принято: токен, номер или файл не подошли")
     elif args.approve:
-        print("смена поколения принята" if generations.approve(ROOT / "state", args.approve) else "токен не подошёл")
+        if len(args.approve) > 2:
+            print("формат: --approve ТОКЕН [НОМЕР]")
+        else:
+            index = None
+            ok = True
+            if len(args.approve) == 2:
+                try:
+                    index = int(args.approve[1])
+                except ValueError:
+                    ok = False
+            if not ok:
+                print("формат: --approve ТОКЕН [НОМЕР]")
+            else:
+                print("смена поколения принята" if generations.approve(ROOT / "state", args.approve[0], index)
+                      else "токен или номер не подошёл")
+    elif args.generation:
+        data = generations.pending(ROOT / "state")
+        if data is None or not data.get("kids"):
+            print("ожидания нет")
+        else:
+            for i, kid in enumerate(data["kids"]):
+                print(i, kid["score"], json.dumps(kid["genome"], ensure_ascii=False, sort_keys=True))
     elif args.body:
         print(json.dumps(inventory().__dict__, ensure_ascii=False, indent=2))
     elif args.demo:

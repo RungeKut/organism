@@ -108,6 +108,13 @@ class SkillsTest(unittest.TestCase):
         self.repeat(3, "статус", ["git status"])
         self.assertEqual(mine(self.j, 1e12), [])
 
+    def test_many_sensations_do_not_change_mine(self):
+        self.repeat(3, "статус", ["git status"])
+        for i in range(500):
+            self.j.event(Event("ощущение", "тело", {"боль": False, "episode": f"о{i}"}, t=1.0 + i))
+        self.j.event(Event("ощущение", "тело", {"episode": "ep1", "text": "чужой вход"}, t=0.5))
+        self.assertEqual(mine(self.j, 0), [Chain("статус", ("git status",), 3, 1.0)])
+
 
 if __name__ == "__main__":
     unittest.main()

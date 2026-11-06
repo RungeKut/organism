@@ -127,15 +127,21 @@ def pending(state: Path) -> dict | None:
     return read_json(path) if path.exists() else None
 
 
-def approve(state: Path, token: str) -> bool:
+def approve(state: Path, token: str, index: int | None = None) -> bool:
     path = Path(state) / PENDING
     data = pending(state)
     if data is None or not data.get("kids") or not isinstance(token, str):
         return False
     if not secrets.compare_digest(str(data.get("token", "")).encode(), token.encode()):
         return False
-    best = max(data["kids"], key=lambda k: k["score"])
-    genome = Genome(**_known(Genome, best["genome"]))
+    kids = data["kids"]
+    if index is None:
+        chosen = max(kids, key=lambda k: k["score"])
+    elif isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(kids):
+        chosen = kids[index]
+    else:
+        return False
+    genome = Genome(**_known(Genome, chosen["genome"]))
     for name in BOUNDS:
         setattr(genome, name, _clip(name, getattr(genome, name)))
     genome.save(Path(state) / "genome.json")
