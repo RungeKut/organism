@@ -50,9 +50,12 @@ def dir_mb(path: Path) -> float:
 
 
 async def soak(url: str, state: Path, hours: float, every_s: float, generations_every: int,
-               out: Path | None, genome: Genome | None = None) -> dict:
+               out: Path | None, genome: Genome | None = None, sense_keep_hours: float | None = None,
+               architect_every: int = 0) -> dict:
     territory = replace(Territory.load(ROOT / "config" / "territory.json"),
-                        generation_every_sleeps=generations_every)
+                        generation_every_sleeps=generations_every, architect_every_sleeps=architect_every)
+    if sense_keep_hours is not None:
+        territory = replace(territory, sense_keep_hours=sense_keep_hours)
     llm = LlamaCpp(url, AIMD(territory.max_llm_slots), territory.allow_network)
     org = Organism(state, llm, territory, genome or Genome(), seed=1)
     await org.start()
@@ -92,12 +95,17 @@ async def soak(url: str, state: Path, hours: float, every_s: float, generations_
             "SELECT text FROM memory WHERE kind = 'аудит' AND t >= ? ORDER BY id", (wall0,))]
         for topic in ("поколение_предложено", "поколение_не_лучше"):
             breeds += [{"итог": topic, **p} for _, _, p in org.journal.events_since(wall0, topic)]
+        senses = org.journal.db.execute("SELECT COUNT(*) FROM events WHERE topic = 'ощущение'").fetchone()[0]
+        architects = [{"итог": topic, **p} for topic in ("архитектор_предложил", "архитектор_не_лучше",
+                                                         "архитектор_без_предложения")
+                      for _, _, p in org.journal.events_since(wall0, topic)]
         await org.stop()
     pending = generations.pending(state)
     saved = state / "genome.json"
     return {**totals, "геном_прежний": not saved.exists() or Genome.load(saved) == org.genome, "мин": round((time.monotonic() - t0) / 60, 1), "снов": org.sleeps, "сны": sleeps,
             "rss_mb": {"начало": rss[0] if rss else 0, "конец": rss[-1] if rss else 0, "макс": max(rss, default=0)},
-            "state_mb": dir_mb(state), "сбои": faults, "аудит": findings, "разведения": breeds, "поколение_ждёт": bool(pending),
+            "state_mb": dir_mb(state), "сбои": faults, "аудит": findings, "разведения": breeds, "ощущений_в_журнале": senses, "архитектор": architects,
+            "поколение_ждёт": bool(pending),
             "детей": len(pending.get("kids", [])) if pending else 0}
 
 
@@ -108,6 +116,8 @@ def main(argv=None) -> int:
     ap.add_argument("--hours", type=float, default=1.0)
     ap.add_argument("--every", type=float, default=60.0, help="секунд между вопросами")
     ap.add_argument("--generations", type=int, default=0, help="generation_every_sleeps на время прогона")
+    ap.add_argument("--sense-keep", type=float, default=None, help="sense_keep_hours на время прогона")
+    ap.add_argument("--architect", type=int, default=0, help="architect_every_sleeps на время прогона")
     ap.add_argument("--log", default=None, help="jsonl с замерами")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
@@ -116,7 +126,7 @@ def main(argv=None) -> int:
         print(f"llama-server не отвечает на {url}", file=sys.stderr)
         return 2
     report = asyncio.run(soak(url, Path(args.state), args.hours, args.every, args.generations,
-                              Path(args.log) if args.log else None))
+                              Path(args.log) if args.log else None, None, args.sense_keep, args.architect))
     text = json.dumps(report, ensure_ascii=False, indent=2, default=str)
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
