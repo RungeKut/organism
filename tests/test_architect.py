@@ -70,10 +70,12 @@ class Scripted(LLM):
 class ArchitectOrganismTest(unittest.IsolatedAsyncioTestCase):
     async def run_architect(self, llm):
         with tempfile.TemporaryDirectory() as tmp:
+            professions = Path(tmp) / "professions.json"
+            professions.write_text("[]", encoding="utf-8")
             org = Organism(tmp, llm, Territory(exec_allowlist=()), Genome())
             holdout.add(Path(tmp), "вопрос один")
             holdout.add(Path(tmp), "вопрос два")
-            await org._architect()
+            await org._architect(professions)
             topics = [t for _, t, _, _ in org.journal.all_events_since(0)]
             pending = proposals.pending(Path(tmp))
             org.journal.close()

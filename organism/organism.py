@@ -216,9 +216,9 @@ class Organism:
                 self.journal.prune_events("ощущение", time.time() - self.territory.sense_keep_hours * 3600.0)
             self.stem.sleep_done()
 
-    async def _architect(self) -> None:
+    async def _architect(self, professions_path: Path | None = None) -> None:
         from . import architect, proposals
-        path = ROOT / "config" / "professions.json"
+        path = professions_path or ROOT / "config" / "professions.json"
         before = path.read_text(encoding="utf-8") if path.exists() else "[]"
         failures: dict[str, int] = {}
         for _, kind, ok, _ in self.journal.all_actions_since(0):

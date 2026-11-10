@@ -103,11 +103,13 @@ async def duel(llm: LLM, mother: Mother, base_prompt: str, new_prompt: str, text
         new = await _answer(llm, new_prompt, text)
         if base is None or new is None:
             continue
-        calls = [] if log is not None else None
-        share = await mother.compare(text, base, new, log=calls)
+        if log is None:
+            share = await mother.compare(text, base, new)
+        else:
+            calls: list[dict] = []
+            share = await mother.compare(text, base, new, log=calls.append)
+            log({"вопрос": text, "база": base, "новая": new, "доля_нового": share, "судья": calls})
         if share is not None:
             wins += share
             parsed += 1
-        if log is not None:
-            log({"вопрос": text, "база": base, "новая": new, "доля_нового": share, "судья": calls})
     return wins / parsed if parsed else 0.5
