@@ -16,3 +16,8 @@ class HwDuelTest(unittest.TestCase):
         self.assertEqual(len(report["судья"]), 2)
         self.assertEqual({row["порядок"] for row in report["судья"]}, {"АБ", "БА"})
         self.assertEqual(report["сводка"]["нулевая"]["среднее"], 0.5)
+
+    def test_external_judge(self):
+        report = asyncio.run(hw_duel.run("", 1, ["Вопрос один?"], FakeLLM(delay_s=0), FakeLLM(delay_s=0)))
+        self.assertEqual(len(report["дуэли"]), 3)
+        self.assertEqual(report["сводка"]["хуже"]["среднее"], 0.5)

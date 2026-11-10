@@ -47,19 +47,20 @@ async def judge_probe(llm, text: str) -> list[dict]:
     return rows
 
 
-async def run(url: str, rounds: int, texts: list[str], llm=None) -> dict:
+async def run(url: str, rounds: int, texts: list[str], llm=None, judge=None) -> dict:
     territory = Territory.load(ROOT / "config" / "territory.json")
     llm = llm or LlamaCpp(url, AIMD(territory.max_llm_slots), territory.allow_network)
+    judge = judge or llm
     duels, probes = [], []
     with tempfile.TemporaryDirectory() as tmp:
-        mother = Mother(llm, Genome(), Path(tmp) / "birth")
+        mother = Mother(judge, Genome(), Path(tmp) / "birth")
         for name, (base, new) in PROMPTS.items():
             for r in range(rounds):
                 t0 = time.perf_counter()
                 p = await architect.duel(llm, mother, base, new, texts)
                 duels.append({"случай": name, "раунд": r + 1, "доля_побед_нового": round(p, 3),
                               "сек": round(time.perf_counter() - t0, 1)})
-        probes = await judge_probe(llm, texts[0])
+        probes = await judge_probe(judge, texts[0])
     summary = {}
     for name in PROMPTS:
         vals = [d["доля_побед_нового"] for d in duels if d["случай"] == name]
@@ -73,12 +74,14 @@ async def run(url: str, rounds: int, texts: list[str], llm=None) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Проверка дуэли «матери» на настоящем llama-server (без записи в config/)")
     ap.add_argument("--url", default="http://127.0.0.1:8080")
+    ap.add_argument("--judge-url", default=None, help="адрес судьи; по умолчанию та же модель")
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     if args.rounds < 1:
         ap.error("--rounds должен быть не меньше 1")
-    text = json.dumps(asyncio.run(run(args.url, args.rounds, ASKED)), ensure_ascii=False, indent=2)
+    judge = LlamaCpp(args.judge_url, AIMD(1), Territory.load(ROOT / "config" / "territory.json").allow_network) if args.judge_url else None
+    text = json.dumps(asyncio.run(run(args.url, args.rounds, ASKED, judge=judge)), ensure_ascii=False, indent=2)
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
     print(text, flush=True)
