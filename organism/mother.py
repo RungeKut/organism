@@ -37,7 +37,7 @@ class Mother:
         m = NUMBER.search(raw)
         return min(1.0, max(0.0, float(m.group().replace(",", ".")))) if m else None
 
-    async def compare(self, question: str, first: str, second: str) -> float | None:
+    async def compare(self, question: str, first: str, second: str, log=None) -> float | None:
         system = "Сравни два ответа на вопрос по полезности и точности. Ответь одной цифрой: 1 или 2."
         wins, parsed = 0, 0
         try:
@@ -46,6 +46,9 @@ class Mother:
                                            {"role": "user", "content": f"Вопрос: {question}\nОтвет 1: {a}\nОтвет 2: {b}"}],
                                           max_tokens=8)
                 m = CHOICE.search(raw)
+                if log is not None:
+                    log({"порядок": "АБ" if i == 0 else "БА",
+                         "выбор": m.group() if m else None, "сырое": raw.strip()[:60]})
                 if m is None:
                     continue
                 parsed += 1

@@ -57,9 +57,10 @@ async def run(url: str, rounds: int, texts: list[str], llm=None, judge=None) -> 
         for name, (base, new) in PROMPTS.items():
             for r in range(rounds):
                 t0 = time.perf_counter()
-                p = await architect.duel(llm, mother, base, new, texts)
+                rows: list[dict] = []
+                p = await architect.duel(llm, mother, base, new, texts, log=rows)
                 duels.append({"случай": name, "раунд": r + 1, "доля_побед_нового": round(p, 3),
-                              "сек": round(time.perf_counter() - t0, 1)})
+                              "сек": round(time.perf_counter() - t0, 1), "детали": rows})
         probes = await judge_probe(judge, texts[0])
     summary = {}
     for name in PROMPTS:

@@ -15,6 +15,10 @@ class HwDuelTest(unittest.TestCase):
             self.assertGreaterEqual(d["сек"], 0)
         self.assertEqual(len(report["судья"]), 2)
         self.assertEqual({row["порядок"] for row in report["судья"]}, {"АБ", "БА"})
+        detail = report["дуэли"][0]["детали"]
+        self.assertEqual(len(detail), 1)
+        self.assertEqual(detail[0]["доля_нового"], 0.5)
+        self.assertEqual([c["выбор"] for c in detail[0]["судья"]], ["1", "1"])
         self.assertEqual(report["сводка"]["нулевая"]["среднее"], 0.5)
 
     def test_external_judge(self):

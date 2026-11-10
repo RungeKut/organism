@@ -96,15 +96,18 @@ async def _answer(llm: LLM, prompt: str, text: str) -> str | None:
     return raw.strip()
 
 
-async def duel(llm: LLM, mother: Mother, base_prompt: str, new_prompt: str, texts: list[str]) -> float:
+async def duel(llm: LLM, mother: Mother, base_prompt: str, new_prompt: str, texts: list[str], log=None) -> float:
     wins, parsed = 0.0, 0
     for text in texts:
         base = await _answer(llm, base_prompt, text)
         new = await _answer(llm, new_prompt, text)
         if base is None or new is None:
             continue
-        share = await mother.compare(text, base, new)
+        calls = [] if log is not None else None
+        share = await mother.compare(text, base, new, log=calls)
         if share is not None:
             wins += share
             parsed += 1
+        if log is not None:
+            log({"вопрос": text, "база": base, "новая": new, "доля_нового": share, "судья": calls})
     return wins / parsed if parsed else 0.5
