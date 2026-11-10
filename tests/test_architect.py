@@ -43,11 +43,15 @@ class ChangedTest(unittest.TestCase):
 class QuestionsTest(unittest.IsolatedAsyncioTestCase):
     async def test_questions_parsed_from_lines(self):
         class Q(LLM):
-            async def chat(self, messages, max_tokens=256, lora=None, deadline_s=None):
-                return "\n".join(["1. Что такое рынок?", "- Как считать маржу?", "", "а", "3) Зачем нужен бюджет?", "лишний вопрос здесь"])
+            async def chat(self, messages, max_tokens=256, lora=None, deadline_s=None) -> str:
+                return "\n".join(["1. Что такое рынок?", "- Как считать маржу?", "", "а", "3) Зачем нужен бюджет?",
+                                  "Как проверить PR?", "Как посчитать маржу с налогом?", "Что включить в договор?",
+                                  "Как перевести срок поставки?", "лишний вопрос здесь", "ещё один"])
 
         got = await architect.questions(Q(), GOOD)
-        self.assertEqual(got, ["Что такое рынок?", "Как считать маржу?", "Зачем нужен бюджет?"])
+        self.assertEqual(len(got), architect.QUESTIONS)
+        self.assertEqual(got[0], "Что такое рынок?")
+        self.assertNotIn("а", got)
 
 
 class Scripted(LLM):
