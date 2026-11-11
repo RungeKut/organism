@@ -34,6 +34,15 @@ class ChangedTest(unittest.TestCase):
         self.assertEqual(architect.changed(dump([GOOD, other]), dump([edit, other]), RES), edit)
         self.assertIsNone(architect.changed(dump([GOOD]), dump([GOOD]), RES))
 
+    def test_echo_of_accepted_profession_does_not_block_new_one(self):
+        live = {"name": "аналитик", "prompt": "Ты аналитик.", "lora_id": None, "tools": []}
+        fresh = {"name": "юрист", "prompt": "Ты юрист.", "lora_id": None, "tools": []}
+        res = RES | {"аналитик"}
+        self.assertEqual(architect.changed(dump([live]), dump([live, fresh]), res), fresh)
+        edit = dict(live, prompt="Ты аналитик данных.")
+        self.assertEqual(architect.changed(dump([live]), dump([edit]), res), edit)
+        self.assertIsNone(architect.changed("[]", dump([dict(fresh, name="аналитик")]), res))
+
     def test_extract_from_noisy_answer(self):
         self.assertEqual(json.loads(architect.extract("вот: " + dump([GOOD]) + " готово")), [GOOD])
         self.assertIsNone(architect.extract("нет списка"))

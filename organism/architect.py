@@ -42,7 +42,7 @@ def changed(before: str, after: str, reserved: frozenset[str]) -> dict | None:
         return None
     for row in new:
         name, prompt = row.get("name"), row.get("prompt")
-        if not isinstance(name, str) or not NAME.match(name) or name in reserved:
+        if not isinstance(name, str) or not NAME.match(name):
             return None
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_PROMPT:
             return None
@@ -53,7 +53,12 @@ def changed(before: str, after: str, reserved: frozenset[str]) -> dict | None:
     old_by = {r.get("name"): r for r in old}
     diff = [r for r in new if old_by.get(r["name"]) != r]
     removed = set(old_by) - {r["name"] for r in new}
-    return diff[0] if len(diff) == 1 and not removed else None
+    if len(diff) != 1 or removed:
+        return None
+    row = diff[0]
+    if row["name"] in reserved and row["name"] not in old_by:
+        return None
+    return row
 
 
 def summary(memories: list[str], stats: dict, inputs: list[str], failures: dict) -> str:
