@@ -43,6 +43,13 @@ class ChangedTest(unittest.TestCase):
         self.assertEqual(architect.changed(dump([live]), dump([edit]), res), edit)
         self.assertIsNone(architect.changed("[]", dump([dict(fresh, name="аналитик")]), res))
 
+    def test_duplicate_prompt_of_existing_profession_is_rejected(self):
+        live = {"name": "аналитик", "prompt": "Ты аналитик.", "lora_id": None, "tools": []}
+        clone = {"name": "копия", "prompt": "Ты аналитик.", "lora_id": None, "tools": []}
+        self.assertIsNone(architect.changed(dump([live]), dump([live, clone]), RES))
+        variant = dict(clone, prompt="Ты аналитик. Отвечай таблицей.")
+        self.assertEqual(architect.changed(dump([live]), dump([live, variant]), RES), variant)
+
     def test_extract_from_noisy_answer(self):
         self.assertEqual(json.loads(architect.extract("вот: " + dump([GOOD]) + " готово")), [GOOD])
         self.assertIsNone(architect.extract("нет списка"))

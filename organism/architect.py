@@ -58,6 +58,9 @@ def changed(before: str, after: str, reserved: frozenset[str]) -> dict | None:
     row = diff[0]
     if row["name"] in reserved and row["name"] not in old_by:
         return None
+    if row["name"] not in old_by:
+        if any(other.get("prompt") == row["prompt"] for other in old):
+            return None
     return row
 
 
